@@ -114,6 +114,34 @@ class WidgetInstance:
 
 
 _PROFILE: QWebEngineProfile | None = None
+_VIEWS: list = []
+
+
+def shutdown() -> None:
+    """Tear down in the order QtWebEngine needs (pages, then views, then the
+    profile). Leaving it to Python's exit order can abort with
+    'free(): invalid pointer'. Deleting the profile also flushes localStorage."""
+    global _PROFILE
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    for v in _VIEWS:
+        try:
+            v.hide()
+            v.page().deleteLater()
+        except RuntimeError:            # already gone
+            pass
+    app.processEvents()
+    for v in _VIEWS:
+        try:
+            v.deleteLater()
+        except RuntimeError:
+            pass
+    _VIEWS.clear()
+    app.processEvents()
+    if _PROFILE is not None:
+        _PROFILE.deleteLater()
+        _PROFILE = None
+        app.processEvents()
 
 
 def profile() -> QWebEngineProfile:
@@ -146,6 +174,7 @@ class WidgetView(QWebEngineView):
         super().__init__(parent)
         self.inst = inst
         page = LoggingPage(profile(), inst.instance, self)
+        _VIEWS.append(self)
         self.setPage(page)
         s = page.settings()
         # NB: do not enable LocalContentCanAccessRemoteUrls: in QtWebEngine it stops

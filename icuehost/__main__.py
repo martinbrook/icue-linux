@@ -43,6 +43,14 @@ def _app():
     from PySide6.QtCore import Qt, QCoreApplication
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import qInstallMessageHandler
+
+    def _qt_log(mode, ctx, msg):
+        # Expected: our Edge windows refuse focus on purpose (see _no_focus).
+        if "WindowDoesNotAcceptFocus" in msg:
+            return
+        sys.stderr.write(msg + "\n")
+    qInstallMessageHandler(_qt_log)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("icue-linux")
     return app
@@ -55,6 +63,18 @@ def _no_focus(w):
     from PySide6.QtCore import Qt
     w.setWindowFlag(Qt.WindowType.WindowDoesNotAcceptFocus, True)
     w.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+
+
+def _exit(app, rc=None):
+    """Run the event loop (unless rc given), tear WebEngine down cleanly, exit
+    without letting Python's finaliser touch Qt objects again."""
+    import os
+    from .host import shutdown
+    if rc is None:
+        rc = app.exec()
+    shutdown()
+    sys.stdout.flush(); sys.stderr.flush()
+    os._exit(rc)
 
 
 def cmd_info(a):
@@ -87,7 +107,10 @@ def cmd_preview(a):
         from .settings_ui import SettingsPanel
         v._panel = SettingsPanel(v)
         v._panel.show()
-    sys.exit(app.exec())
+    if a.quit_after:
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(a.quit_after * 1000, app.quit)
+    _exit(app)
 
 
 def cmd_screens(a):
@@ -104,7 +127,12 @@ def cmd_run(a):
     from .host import WidgetInstance, WidgetView
     from .plugins import PluginHub
 
-    cfg = tomllib.loads(Path(a.layout).expanduser().read_text())
+    target = Path(a.layout).expanduser()
+    if target.is_dir() or target.suffix in (".icuewidget", ".zip"):
+        # a single widget: fill the Edge with it
+        cfg = {"widget": [{"path": str(target.resolve()), "x": 0, "y": 0, "size": "full"}]}
+    else:
+        cfg = tomllib.loads(target.read_text())
     disp = cfg.get("display", {})
     hub = PluginHub(disp.get("temperature_unit", "°C"))
     match = str(disp.get("match", "XENEON")).lower()
@@ -151,7 +179,7 @@ def cmd_run(a):
     if a.quit_after:
         from PySide6.QtCore import QTimer
         QTimer.singleShot(a.quit_after * 1000, app.quit)
-    sys.exit(app.exec())
+    _exit(app)
 
 
 def main(argv=None):
@@ -165,10 +193,11 @@ def main(argv=None):
     p.add_argument("--settings", action="store_true", help="open the generated settings panel")
     p.add_argument("--background", default="#000000")
     p.add_argument("--focus", action="store_true", help="let the preview window take keyboard focus")
+    p.add_argument("--quit-after", type=int, default=0, help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_preview)
     p = sub.add_parser("info"); p.add_argument("widget"); p.add_argument("--instance")
     p.set_defaults(fn=cmd_info)
-    p = sub.add_parser("run"); p.add_argument("layout")
+    p = sub.add_parser("run"); p.add_argument("layout", help="layout .toml, or a single widget to show full-screen")
     p.add_argument("--quit-after", type=int, default=0, help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("screens"); p.set_defaults(fn=cmd_screens)

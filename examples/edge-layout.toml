@@ -8,7 +8,7 @@ language = "en"
 background = "#000000"
 
 [[widget]]
-path = "~/Downloads/Moon_Phase_Clock-2.0.1.icuewidget"   # adjust to where you saved it
+path = "~/icue/Moon Phase Clock-2.0.1.icuewidget"   # adjust to where you saved it
 instance = "moon"
 x = 12
 y = 12
@@ -22,7 +22,7 @@ x = 12
 y = 366
 w = 840
 h = 342
-values = { serverUrl = "http://corsair-300:8731", displayName = "Corsair 300" }
+values = { serverUrl = "http://CORSAIR-IP:8731", displayName = "Corsair 300" }   # put the Corsair's IP here
 
 [[widget]]
 path = "examples/deck"
