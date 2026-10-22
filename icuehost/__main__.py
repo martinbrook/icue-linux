@@ -128,7 +128,13 @@ def cmd_run(a):
     win.setGeometry(screen.geometry())
     win.views = []
     for spec in cfg.get("widget", []):
-        inst = WidgetInstance(spec["path"], hub, instance=spec.get("instance"),
+        wpath = Path(spec["path"]).expanduser()
+        if not wpath.is_absolute() and not wpath.exists():      # relative to the layout file
+            wpath = Path(a.layout).expanduser().resolve().parent / wpath
+        if not wpath.exists():
+            print(f"[icue-linux] skipping {spec.get('instance') or spec['path']}: {wpath} not found")
+            continue
+        inst = WidgetInstance(wpath, hub, instance=spec.get("instance"),
                               language=disp.get("language"),
                               temperature_unit=disp.get("temperature_unit", "°C"),
                               overrides=spec.get("values"))
@@ -136,8 +142,11 @@ def cmd_run(a):
         w, h = _size(spec.get("size", "small"))
         v.setGeometry(spec.get("x", 0), spec.get("y", 0), spec.get("w", w), spec.get("h", h))
         win.views.append(v)
-    win.show()
+    # Pick the screen before the window is mapped: Wayland compositors ignore
+    # moves after the fact, so setting it later can leave us on the wrong monitor.
+    win.winId()
     win.windowHandle().setScreen(screen)
+    win.setGeometry(screen.geometry())
     win.showFullScreen()
     if a.quit_after:
         from PySide6.QtCore import QTimer

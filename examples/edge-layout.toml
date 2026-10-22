@@ -1,0 +1,33 @@
+# Xeneon Edge (2560x720) — MoonPhase clock and LLM monitor on the left, Deck on the right.
+# Run with:  icue-linux run examples/edge-layout.toml
+
+[display]
+match = "XENEON"            # matches "CRX XENEON EDGE" on DP-2
+temperature_unit = "°C"
+language = "en"
+background = "#000000"
+
+[[widget]]
+path = "~/Downloads/Moon_Phase_Clock-2.0.1.icuewidget"   # adjust to where you saved it
+instance = "moon"
+x = 12
+y = 12
+w = 840
+h = 342
+
+[[widget]]
+path = "examples/llm-monitor"
+instance = "llm-corsair"
+x = 12
+y = 366
+w = 840
+h = 342
+values = { serverUrl = "http://corsair-300:8731", displayName = "Corsair 300" }
+
+[[widget]]
+path = "examples/deck"
+instance = "deck"
+x = 864
+y = 12
+w = 1684
+h = 696
