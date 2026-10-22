@@ -19,10 +19,12 @@ from __future__ import annotations
 import json
 import re
 import time
+import urllib.error
+import urllib.request
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
-from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from .base import PluginBase
 
@@ -108,23 +110,35 @@ def engine_of(metrics: dict[str, float], server_header: str) -> str:
     return (server_header or "").split(" ")[0].split("/")[0]
 
 
-def _header(reply: QNetworkReply, name: str) -> str:
-    """rawHeader takes str in PySide6 >= 6.10, bytes before."""
-    for arg in (name, name.encode()):
-        try:
-            return bytes(reply.rawHeader(arg)).decode("latin-1")
-        except TypeError:
-            continue
-    return ""
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # LAN servers: no proxy
 
 
-def _set_header(req: QNetworkRequest, name: str, value: str) -> None:
-    for args in ((name.encode(), value.encode()), (name, value)):
-        try:
-            req.setRawHeader(*args)
-            return
-        except TypeError:
-            continue
+def _fetch(url: str, timeout: float):
+    """(ok, body, ms, error, server) for one GET. Runs on a worker thread."""
+    t0 = time.monotonic()
+    req = urllib.request.Request(url, headers={"Accept": "application/json, text/plain"})
+    try:
+        with _OPENER.open(req, timeout=timeout) as resp:
+            body = resp.read(4 << 20).decode("utf-8", "replace")
+            return (200 <= resp.status < 300, body, (time.monotonic() - t0) * 1000, "",
+                    resp.headers.get("Server", ""))
+    except urllib.error.HTTPError as e:
+        return False, "", (time.monotonic() - t0) * 1000, f"HTTP {e.code}", e.headers.get("Server", "")
+    except urllib.error.URLError as e:
+        reason = e.reason
+        msg = getattr(reason, "strerror", None) or str(reason)
+        if isinstance(reason, ConnectionRefusedError):
+            msg = "Connection refused"
+        elif "timed out" in str(reason):
+            msg = "timed out"
+        return False, "", (time.monotonic() - t0) * 1000, msg, ""
+    except (OSError, ValueError) as e:     # socket timeouts, bad URLs
+        return False, "", (time.monotonic() - t0) * 1000, "timed out" if "timed out" in str(e) else str(e), ""
+
+
+def _fetch_job(plugin, watch, url, timeout, cb):
+    result = _fetch(url, timeout)
+    plugin._fetched.emit((watch, cb, result))     # queued to the Qt thread
 
 
 class _Watch(QObject):
@@ -153,27 +167,13 @@ class _Watch(QObject):
         self.timer.start(max(500, int(ms)))
 
     def _get(self, path: str, cb):
-        req = QNetworkRequest(QUrl(self.base + path))
-        req.setTransferTimeout(min(self.timer.interval(), 3000))
-        _set_header(req, "Accept", "application/json, text/plain")
-        t0 = time.monotonic()
-        reply = self.p.nam.get(req)
+        """Fetch base+path on a worker thread; cb runs on the Qt thread.
+        Plain urllib instead of QNetworkAccessManager: no QNetworkReply objects
+        whose C++/Python lifetimes can disagree (a double free showed up as
+        'free(): invalid pointer' during garbage collection)."""
         self.pending += 1
-
-        def done():
-            self.pending -= 1
-            ok = reply.error() == QNetworkReply.NetworkError.NoError
-            status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute) or 0
-            body = bytes(reply.readAll()).decode("utf-8", "replace")
-            server = _header(reply, "Server")
-            err = reply.errorString() if not ok else ""
-            reply.deleteLater()
-            try:
-                cb(ok and 200 <= int(status) < 300, body, (time.monotonic() - t0) * 1000, err, server)
-            finally:
-                if self.pending == 0:
-                    self.publish()
-        reply.finished.connect(done)
+        timeout = min(self.timer.interval(), 3000) / 1000
+        self.p.pool.submit(_fetch_job, self.p, self, self.base + path, timeout, cb)
 
     def poll(self):
         if self.pending:            # previous round still in flight
@@ -354,10 +354,24 @@ class LlmMonitorPlugin(PluginBase):
 
     statsUpdated = Signal(str, str)           # base url, JSON stats
 
+    _fetched = Signal(object)                 # (watch, callback, result) from worker threads
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.nam = QNetworkAccessManager(self)
+        self.pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="llm-poll")
+        self._fetched.connect(self._deliver)
         self.watches: dict[str, _Watch] = {}
+
+    def _deliver(self, item):
+        watch, cb, (ok, body, ms, err, server) = item
+        watch.pending -= 1
+        if watch not in self.watches.values():        # unwatched meanwhile
+            return
+        try:
+            cb(ok, body, ms, err, server)
+        finally:
+            if watch.pending == 0:
+                watch.publish()
 
     @Slot(str, int)
     def watch(self, url: str, interval_ms: int = 2000):
@@ -381,7 +395,7 @@ class LlmMonitorPlugin(PluginBase):
         w = self.watches.pop(url.rstrip("/"), None)
         if w:
             w.timer.stop()
-            w.deleteLater()
+            w.setParent(None)      # Python owns it now; freed normally when unreferenced
 
     @Slot(int, str)
     def getStats(self, rid: int, url: str):
