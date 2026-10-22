@@ -16,5 +16,5 @@ packages = ["icuehost", "icuehost.plugins"]
 icuehost = ["shim.js"]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=40.8"]
 build-backend = "setuptools.build_meta"
