@@ -6,3 +6,4 @@ tests/.cfg-llm/
 tests/llm-*.png
 tests/.cfg-deck/
 tests/.deck-state/
+.venv/
