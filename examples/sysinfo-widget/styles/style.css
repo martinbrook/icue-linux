@@ -1,0 +1,8 @@
+html, body { margin: 0; height: 100%; background: transparent; font-family: system-ui, sans-serif; }
+body { display: flex; flex-direction: column; justify-content: center; gap: .4em; padding: 0 1em; box-sizing: border-box; }
+.row { display: flex; align-items: center; gap: .6em; }
+.name { width: 9em; opacity: .7; }
+.bar { flex: 1; height: .5em; background: #ffffff22; border-radius: .25em; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; transition: width .4s; }
+#media { opacity: .8; font-size: .7em; }
+body.text .bar { display: none; }

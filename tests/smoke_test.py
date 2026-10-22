@@ -50,7 +50,7 @@ def step_change():
 
 def collect():
     view.page().runJavaScript("JSON.stringify({t: window.__test, color: document.body.style.color,"
-                              " cls: document.body.className, rows: document.querySelectorAll('.row').length})",
+                              " cls: document.body.className, flex: getComputedStyle(document.body).display, rows: document.querySelectorAll('.row').length})",
                               0, report)
 
 
@@ -70,6 +70,7 @@ def report(raw):
     check(t.get("values", {}).get(tid) == "61.5", f"sensorValueChanged delivered new value ({t.get('values', {}).get(tid)})")
     check(r.get("color") == "rgb(255, 0, 0)", "property update reached the page")
     check(r.get("cls") == "text", "combobox key value applied")
+    check(r.get("flex") == "flex", "external stylesheet applied (file:// CSS)")
     check(t.get("tr") == "Textfarbe", "runtime tr() promise translates (de)")
     check((t.get("storage") or {}).get("launches") == 1, "localStorage keyed by uniqueId")
     icue = t.get("icue") or {}
