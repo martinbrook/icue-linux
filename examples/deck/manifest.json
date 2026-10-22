@@ -1,5 +1,5 @@
 {
-  "author": "Martin",
+  "author": "Martin Brook",
   "id": "org.icuelinux.deck",
   "name": "Deck",
   "description": "Stream Deck-style touch buttons: launch apps, send keystrokes, control Spotify. Buttons are defined in ~/.config/icue-linux/deck.toml. Needs the icue-linux host.",

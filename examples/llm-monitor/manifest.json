@@ -1,5 +1,5 @@
 {
-  "author": "Martin",
+  "author": "Martin Brook",
   "id": "org.icuelinux.llmmonitor",
   "name": "LLM Monitor",
   "description": "Live status, throughput and load of an OpenAI-compatible LLM server (vLLM, llama.cpp, SGLang and others). Needs the icue-linux host.",
