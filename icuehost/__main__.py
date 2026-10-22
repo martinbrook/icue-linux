@@ -69,8 +69,17 @@ def _exit(app, rc=None):
     """Run the event loop (unless rc given), tear WebEngine down cleanly, exit
     without letting Python's finaliser touch Qt objects again."""
     import os
+    import signal
+    from PySide6.QtCore import QTimer
     from .host import shutdown
     if rc is None:
+        # Ctrl+C / kill: Qt's loop never hands control back to Python, so wake it
+        # regularly to let the signal handlers run, then quit cleanly.
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(sig, lambda *_: app.quit())
+        app._sigtimer = QTimer()
+        app._sigtimer.timeout.connect(lambda: None)
+        app._sigtimer.start(200)
         rc = app.exec()
     shutdown()
     sys.stdout.flush(); sys.stderr.flush()

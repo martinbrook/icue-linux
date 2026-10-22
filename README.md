@@ -129,6 +129,9 @@ python -m icuehost run examples/layout.toml
 `--lang de` and `--temp-unit °F` set what `iCUE.iCUELanguage` and
 `iCUE.defaultTemperatureUnit()` report.
 
+To stop it, press Ctrl+C in the terminal you started it from, or run `pkill -f icue-linux`.
+Both shut down cleanly and save widget state.
+
 Settings and the per-instance `uniqueId` live in `~/.config/icue-linux/instances/`;
 widget localStorage persists in `~/.config/icue-linux/webengine/`.
 
