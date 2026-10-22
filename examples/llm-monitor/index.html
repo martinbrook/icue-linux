@@ -110,7 +110,8 @@
       }
       $("gen").textContent = big;
       $("genLabel").textContent = label;
-      const ptps = s.promptTps != null ? s.promptTps : (!live ? s.lastPromptTps : null);
+      // end-of-request servers: between requests show the last request's prompt rate
+      const ptps = (!live && !busy && s.lastPromptTps != null) ? s.lastPromptTps : s.promptTps;
       $("prompt").textContent = ptps == null ? "–" : fmt(ptps);
 
       $("running").textContent = s.running == null ? "–" : Math.round(s.running) + (s.slotsTotal ? `/${s.slotsTotal}` : "");
