@@ -5,6 +5,8 @@ Run Corsair iCUE HTML widgets (Widget API 1.4.0) on Linux, on the Xeneon Edge or
 This is a clean-room host built from Corsair/Elgato's **public** widget documentation
 (docs.elgato.com/icue/widgets). No iCUE code or binaries are used or needed.
 
+![icue-linux on a Xeneon Edge: clock, LLM Monitor and Deck widgets](screenshot.png)
+
 ## How it works
 
 iCUE renders widgets in QtWebEngine and talks to them through injected globals and
