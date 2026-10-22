@@ -4,6 +4,6 @@ S="$FAKE_STATE"; echo "playerctl $*" >> "$S/calls"
 [ -f "$S/player" ] || echo Playing > "$S/player"
 [ "$1" = "-p" ] && shift 2
 case "$1" in
-  metadata) printf '%s\tWandering Signal\tThe Night Shift\t%s\tspotify\tNone\tfalse\n' "$(cat "$S/player")" "$FAKE_ART" ;;
+  metadata) printf '%s\tWandering Signal\tThe Night Shift Orchestra and the Very Long Name Collective\t%s\tspotify\tNone\tfalse\n' "$(cat "$S/player")" "$FAKE_ART" ;;
   play-pause) if grep -q Playing "$S/player"; then echo Paused > "$S/player"; else echo Playing > "$S/player"; fi ;;
 esac

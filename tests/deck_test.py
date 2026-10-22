@@ -65,8 +65,11 @@ TAP = """(function(i){const b=document.querySelectorAll('#grid .btn')[i]; const 
  const o={bubbles:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:1,isPrimary:true};
  b.dispatchEvent(new PointerEvent('pointerdown',o)); b.dispatchEvent(new PointerEvent('pointerup',o)); return b.textContent.trim().slice(0,40);})(%d)"""
 STATE_JS = """(function(){try{return JSON.stringify({n: document.querySelectorAll('#grid .btn').length, tab: (document.querySelector('.tab.on')||{}).textContent,
- np: (document.querySelector('.np .t')||{}).textContent, art: (document.querySelector('.np .art')||{style:{}}).style.backgroundImage,
+ np: ((document.querySelector('.np .t')||{}).dataset||{}).text, art: (document.querySelector('.np .art')||{style:{}}).style.backgroundImage,
  css: getComputedStyle(document.body).userSelect,
+ mq: (()=>{const f=(sel)=>{const e=document.querySelector(sel); if(!e) return null; const tr=e.querySelector('.mq');
+   return {scrolling: e.classList.contains('scrolling'), copies: tr ? tr.children.length : 0, anims: tr ? tr.getAnimations().length : 0};};
+   return {t: f('.np .t'), a: f('.np .a')};})(),
  artBox: (()=>{const a=document.querySelector('.np .art'); if(!a) return null; const r=a.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)];})(),
  playIcon: (document.querySelectorAll('#grid .btn')[2]||{innerHTML:''}).innerHTML.includes('rect'), toast: document.getElementById('toast').classList.contains('show') ? document.getElementById('toast').textContent : '',
  labels: [...document.querySelectorAll('#grid .lbl')].map(e=>e.textContent), cols: document.getElementById('grid').style.gridTemplateColumns})}catch(e){return JSON.stringify({err: String(e)})}})()"""
@@ -85,6 +88,12 @@ def r1(r):
     check(r["np"] == "Wandering Signal" and "http://127.0.0.1:18077/art.png" in r["art"], "now-playing tile loads album art from the web")
     check(r["css"] == "none", "widget stylesheet applied alongside web access")
     check(r["artBox"] and abs(r["artBox"][0] - r["artBox"][1]) <= 1, f"album art is square {r['artBox']}")
+    mq = r["mq"]
+    check(mq["t"]["scrolling"] and mq["t"]["copies"] == 3 and mq["t"]["anims"] == 1,
+          f"long title scrolls as a continuous loop in the small slot {mq['t']}")
+    check(mq["a"]["scrolling"] and mq["a"]["anims"] == 1, f"long artist scrolls too {mq['a']}")
+    views["xl"].page().runJavaScript("JSON.stringify({s: document.querySelector('.np .t').classList.contains('scrolling'), n: document.querySelector('.np .t .mq').getAnimations().length})",
+        0, lambda x: check(json.loads(x) == {"s": False, "n": 0}, f"title that fits stays still (xl) {x}"))
     check(r["playIcon"], "play button shows pause icon while playing")
     check(deck_file.exists(), "default deck.toml created from example")
 

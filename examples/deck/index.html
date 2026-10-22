@@ -184,14 +184,55 @@
           const art = el.querySelector(".art");
           setArt(art, info && info.art);
           const closed = el.dataset.player === "spotify" && !media.running;
-          el.querySelector(".t").textContent = info && info.title ? info.title : (closed ? T["Spotify is closed"] : T["Nothing playing"]);
-          el.querySelector(".a").textContent = info ? info.artist : (media.error || "");
+          setMarquee(el.querySelector(".t"), info && info.title ? info.title : (closed ? T["Spotify is closed"] : T["Nothing playing"]));
+          setMarquee(el.querySelector(".a"), info ? info.artist : (media.error || ""));
           el.querySelector(".st").innerHTML = info
             ? (playing ? `<span class="eq"><i></i><i></i><i></i></span> ${escapeHtml(info.player || "")}`
                        : `<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ${escapeHtml(info.status)}`)
             : "";
         }
       }
+    }
+
+    // ---------------------------------------------------------- marquee
+    // Text that fits stays still. Text that doesn't scrolls as a continuous
+    // loop: hold the start for a moment, then slide left until a second copy
+    // (after a gap) is exactly where the first began, and repeat seamlessly.
+    const MARQUEE_SPEED = 40;      // px per second
+    const MARQUEE_HOLD = 2000;     // ms at the start of each loop
+    function setMarquee(box, text) {
+      text = text || "";
+      if (box.dataset.text === text && box.firstChild) return;   // unchanged: keep scrolling
+      box.dataset.text = text;
+      box.classList.remove("scrolling");
+      box.innerHTML = "";
+      const track = document.createElement("span");
+      track.className = "mq";
+      const first = document.createElement("span");
+      first.textContent = text;
+      track.appendChild(first);
+      box.appendChild(track);
+      requestAnimationFrame(() => {                 // measure after layout
+        if (box.dataset.text !== text) return;
+        const overflow = first.scrollWidth > box.clientWidth + 1;
+        if (!overflow) return;
+        const gap = Math.max(32, box.clientWidth * 0.25);
+        const spacer = document.createElement("span");
+        spacer.className = "mq-gap";
+        spacer.style.width = gap + "px";
+        const second = first.cloneNode(true);
+        second.setAttribute("aria-hidden", "true");
+        track.append(spacer, second);
+        box.classList.add("scrolling");
+        const distance = first.getBoundingClientRect().width + gap;
+        const travel = distance / MARQUEE_SPEED * 1000;
+        const total = MARQUEE_HOLD + travel;
+        track.animate([
+          { transform: "translateX(0)" },
+          { transform: "translateX(0)", offset: MARQUEE_HOLD / total },
+          { transform: `translateX(${-distance}px)` },
+        ], { duration: total, iterations: Infinity, easing: "linear" });
+      });
     }
 
     function setArt(box, url) {

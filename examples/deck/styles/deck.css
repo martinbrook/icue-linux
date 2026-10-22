@@ -46,6 +46,13 @@ body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--tex
 .np .meta { flex: 1; min-width: 0; padding: 0 6cqh; display: flex; flex-direction: column; gap: 1.6cqh; }
 .np .t { font-size: clamp(12px, 12cqh, 26px); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np .a { font-size: clamp(10px, 9.5cqh, 20px); opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* marquee: the track holds the text (twice, with a gap, when it scrolls) */
+.np .t, .np .a { min-width: 0; }
+.np .mq { display: inline-flex; white-space: nowrap; will-change: transform; }
+.np .mq-gap { display: inline-block; flex: none; }
+.np .scrolling { text-overflow: clip;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 92%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 92%, transparent 100%); }
 .np .st { display: flex; align-items: center; gap: 2cqh; font-size: clamp(9px, 7.7cqh, 16px); color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-top: .6cqh; }
 .np .st svg { width: 1.2em; height: 1.2em; fill: currentColor; }
 .np .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 1em; }
