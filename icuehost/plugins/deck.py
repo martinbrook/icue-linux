@@ -145,6 +145,13 @@ def text_command(backend: str, text: str) -> list[str]:
             "ydotool": ["ydotool", "type", text]}.get(backend, [])
 
 
+def fix_art_url(url: str) -> str:
+    """Spotify's Linux client still reports https://open.spotify.com/image/<id>,
+    which no longer serves images; the same id works on i.scdn.co."""
+    prefix = "https://open.spotify.com/image/"
+    return "https://i.scdn.co/image/" + url[len(prefix):] if url.startswith(prefix) else url
+
+
 # ------------------------------------------------------------------ plugin
 class DeckPlugin(PluginBase):
     MODULE = "icuelinux.deck"
@@ -362,7 +369,7 @@ class DeckPlugin(PluginBase):
                 parts = out.split("\t")
                 if len(parts) >= 5 and parts[0]:
                     info[name] = {"status": parts[0], "title": parts[1], "artist": parts[2],
-                                  "art": parts[3], "player": parts[4],
+                                  "art": fix_art_url(parts[3]), "player": parts[4],
                                   "loop": parts[5] if len(parts) > 5 else "",
                                   "shuffle": parts[6] if len(parts) > 6 else ""}
             info["running"] = "spotify" in info

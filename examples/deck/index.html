@@ -182,8 +182,7 @@
         } else if (verb === "now-playing") {
           el.classList.toggle("paused", !playing);
           const art = el.querySelector(".art");
-          if (info && info.art) { art.style.backgroundImage = `url("${info.art.replace(/"/g, "%22")}")`; art.innerHTML = ""; }
-          else { art.style.backgroundImage = ""; art.innerHTML = `<svg viewBox="0 0 24 24">${DECK_ICONS.music}</svg>`; }
+          setArt(art, info && info.art);
           const closed = el.dataset.player === "spotify" && !media.running;
           el.querySelector(".t").textContent = info && info.title ? info.title : (closed ? T["Spotify is closed"] : T["Nothing playing"]);
           el.querySelector(".a").textContent = info ? info.artist : (media.error || "");
@@ -193,6 +192,17 @@
             : "";
         }
       }
+    }
+
+    function setArt(box, url) {
+      const placeholder = () => { box.style.backgroundImage = ""; box.innerHTML = `<svg viewBox="0 0 24 24">${DECK_ICONS.music}</svg>`; };
+      if (!url) { box.dataset.src = ""; return placeholder(); }
+      if (box.dataset.src === url) return;            // unchanged: keep what's shown
+      box.dataset.src = url;
+      const img = new Image();
+      img.onload = () => { if (box.dataset.src === url) { box.style.backgroundImage = `url("${url.replace(/"/g, "%22")}")`; box.innerHTML = ""; } };
+      img.onerror = () => { if (box.dataset.src === url) placeholder(); };
+      img.src = url;
     }
 
     // --------------------------------------------------------- lifecycle

@@ -27,6 +27,7 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequ
 from .base import PluginBase
 
 HISTORY = 90          # samples kept for sparklines
+MODELS_EVERY = 15     # seconds between /v1/models checks while /metrics works
 
 _LINE = re.compile(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+0-9.eEInfNa]+)')
 
@@ -161,7 +162,14 @@ class _Watch(QObject):
         if self.pending:            # previous round still in flight
             return
         self.round = {"t": time.time()}
-        self._get("/v1/models", self._models)
+        # Once /metrics is known to work it doubles as the health check, so the
+        # model list is only refreshed every MODELS_EVERY seconds (keeps the
+        # server's access log quieter).
+        now = time.monotonic()
+        if (not self.state.get("hasMetrics") or not self.state.get("up")
+                or now - getattr(self, "models_at", 0) >= MODELS_EVERY):
+            self.models_at = now
+            self._get("/v1/models", self._models)
         self._get("/metrics", self._metrics)
         if self.state.get("hasSlots", True):
             self._get("/slots", self._slots)
@@ -182,8 +190,11 @@ class _Watch(QObject):
             r["error"] = err or "no response"
 
     def _metrics(self, ok, body, ms, err, server):
+        r = self.round
+        r["metricsOk"], r["metricsMs"], r["metricsErr"] = ok, round(ms), err
+        r.setdefault("server", server)
         if ok and ("# TYPE" in body or "# HELP" in body or _LINE.search(body)):
-            self.round["metrics"] = parse_prometheus(body)
+            r["metrics"] = parse_prometheus(body)
 
     def _slots(self, ok, body, ms, err, server):
         if not ok:
@@ -200,10 +211,14 @@ class _Watch(QObject):
     def publish(self):
         r, st = self.round, self.state
         m = r.get("metrics") or {}
+        if "up" not in r:                       # models skipped this round: /metrics is the health check
+            r["up"], r["latencyMs"] = r.get("metricsOk", False), r.get("metricsMs")
+            if not r["up"]:
+                r["error"] = r.get("metricsErr") or "no response"
         st.update(up=bool(r.get("up")), latencyMs=r.get("latencyMs"), error=r.get("error", ""),
                   hasMetrics=bool(m), t=r["t"])
-        if r.get("up"):
-            st["models"] = r.get("models", [])
+        if r.get("up") and "models" in r:
+            st["models"] = r["models"]
         st["engine"] = engine_of(m, r.get("server", "")) if (m or r.get("server")) else st.get("engine", "")
 
         _, gen = pick(m, "gen_total")
