@@ -164,11 +164,16 @@ widget localStorage persists in `~/.config/icue-linux/webengine/`.
 
 ### Touch on the Edge
 
-The Edge's touch panel is a standard HID device. Map it to the Edge output so touches land
-there rather than on your main monitor:
+Touch comes over the Edge's **USB-C** cable, so that has to be connected to this PC even if the
+picture comes over DisplayPort or HDMI. Then tell the desktop which screen the touch panel
+belongs to, otherwise taps land on your main monitor:
 
-- GNOME / KDE (Wayland): Settings → touchscreen → map to output
-- X11: `xinput map-to-output "<touch device name>" <output>` (names from `xinput list` / `xrandr`)
+- **GNOME (Wayland or X11):** `icue-linux touch-setup` finds the touchscreen and the Edge and
+  writes GNOME's touchscreen-to-monitor setting. `--dry-run` shows what it would set. If you
+  have more than one touchscreen (some laptops do) it lists them; pick with
+  `--device VVVV:PPPP`.
+- **KDE:** System Settings → Touchscreen → choose the Edge as the target display.
+- **Other X11:** `xinput map-to-output "<touch device>" DP-2` (names from `xinput list`).
 
 Widgets with `"interactive": false` in their manifest ignore input, as on iCUE.
 

@@ -232,6 +232,94 @@ def cmd_gnome_setup(a):
         print("Log out and back in, then run:\n  gnome-extensions enable " + EXT_UUID)
 
 
+def find_touchscreens(text: str) -> list[dict]:
+    """Parse /proc/bus/input/devices for direct-touch devices (touchscreens).
+    INPUT_PROP_DIRECT (bit 1 of PROP) marks screens rather than touchpads."""
+    out = []
+    for block in text.strip().split("\n\n"):
+        info = {}
+        for line in block.splitlines():
+            if line.startswith("I:"):
+                info.update(dict(kv.split("=", 1) for kv in line[3:].split()))
+            elif line.startswith("N: Name="):
+                info["name"] = line.split("=", 1)[1].strip().strip('"')
+            elif line.startswith("B: PROP="):
+                info["prop"] = int(line.split("=", 1)[1].split()[-1], 16)
+            elif line.startswith("B: ABS="):
+                info["abs"] = line.split("=", 1)[1]
+            elif line.startswith("H: Handlers="):
+                info["handlers"] = line.split("=", 1)[1]
+        if info.get("prop", 0) & 0x2 and info.get("abs") and "event" in info.get("handlers", ""):
+            name = info.get("name", "")
+            if "pen" in name.lower() and "touch" not in name.lower():
+                continue                                   # tablets / styluses
+            out.append({"name": name, "vendor": info.get("Vendor", "0000").lower(),
+                        "product": info.get("Product", "0000").lower()})
+    return out
+
+
+def find_monitor(gdbus_text: str, match: str):
+    """(connector, vendor, product, serial) tuples from Mutter's GetCurrentState."""
+    import re
+    for conn, vendor, product, serial in re.findall(
+            r"\('([A-Za-z0-9-]+)', '([^']*)', '([^']*)', '([^']*)'\)", gdbus_text):
+        if match.lower() in (conn + " " + vendor + " " + product).lower():
+            return conn, vendor, product, serial
+    return None
+
+
+def cmd_touch_setup(a):
+    """Map the Edge's touch panel to the Edge's display (GNOME on Wayland)."""
+    import subprocess
+    devs = find_touchscreens(Path("/proc/bus/input/devices").read_text())
+    if not devs:
+        sys.exit("No touchscreen found. Is the Edge's USB-C cable plugged into this PC? "
+                 "(HDMI/DisplayPort carry the picture only; touch comes over USB.)")
+    if a.device:
+        pick = [d for d in devs if f"{d['vendor']}:{d['product']}" == a.device.lower()]
+        if not pick:
+            sys.exit(f"No touchscreen {a.device}. Found: " +
+                     ", ".join(f"{d['vendor']}:{d['product']} ({d['name']})" for d in devs))
+    else:
+        pick = [d for d in devs if any(k in d["name"].lower() for k in ("xeneon", "corsair", "edge"))]
+        if not pick and len(devs) == 1:
+            pick = devs
+    if not pick:
+        # e.g. a laptop with its own touchscreen plus the Edge under a generic name
+        print("More than one touchscreen and none is obviously the Edge:")
+        for d in devs:
+            print(f"  {d['vendor']}:{d['product']}  {d['name']}")
+        sys.exit("Unplug the Edge's USB-C to see which one disappears, then run:\n"
+                 "  icue-linux touch-setup --device VVVV:PPPP")
+    dev = pick[0]
+    try:
+        state = subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.gnome.Mutter.DisplayConfig",
+             "--object-path", "/org/gnome/Mutter/DisplayConfig",
+             "--method", "org.gnome.Mutter.DisplayConfig.GetCurrentState"],
+            capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        state = ""
+    mon = find_monitor(state, a.match)
+    if not mon:
+        sys.exit("Couldn't find the Edge in GNOME's display list (is this a GNOME session?). "
+                 "On X11 use: xinput map-to-output '<touch device name>' DP-2")
+    conn, vendor, product, serial = mon
+    path = f"/org/gnome/desktop/peripherals/touchscreens/{dev['vendor']}:{dev['product']}/"
+    value = f"['{vendor}', '{product}', '{serial}']"
+    cmd = ["gsettings", "set", f"org.gnome.desktop.peripherals.touchscreen:{path}", "output", value]
+    print(f"Touchscreen: {dev['name']} ({dev['vendor']}:{dev['product']})")
+    print(f"Display:     {conn}  {vendor} {product} {serial}")
+    if a.dry_run:
+        print("Would run:\n  " + " ".join(cmd[:3]) + f' output "{value}"')
+        return
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        sys.exit("gsettings failed: " + r.stderr.strip())
+    print("Done. Touches on the Edge now map to the Edge (takes effect immediately;\n"
+          "if not, unplug and replug the Edge's USB-C cable).")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="icue-linux")
     ap.add_argument("--lang", default=None, help="iCUE language code (default: system)")
@@ -251,6 +339,10 @@ def main(argv=None):
     p.add_argument("--quit-after", type=int, default=0, help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("screens"); p.set_defaults(fn=cmd_screens)
+    p = sub.add_parser("touch-setup", help="map the Edge's touch panel to the Edge display (GNOME)")
+    p.add_argument("--match", default="XENEON", help="text identifying the Edge display")
+    p.add_argument("--device", help="touchscreen as vendor:product, if more than one is found")
+    p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_touch_setup)
     p = sub.add_parser("gnome-setup", help="install the GNOME extension that keeps app windows off the Edge")
     p.add_argument("--remove", action="store_true"); p.set_defaults(fn=cmd_gnome_setup)
     a = ap.parse_args(argv)
