@@ -7,6 +7,7 @@ its signals exactly as they would under iCUE.
 from __future__ import annotations
 
 from PySide6.QtCore import QMetaMethod, QObject, QTimer, Signal
+from ..qtfix import emit
 
 
 class PluginBase(QObject):
@@ -20,7 +21,7 @@ class PluginBase(QObject):
 
     def respond(self, request_id: int, value) -> None:
         """Emit asyncResponse on the next event-loop turn, like iCUE does."""
-        QTimer.singleShot(0, lambda: self.asyncResponse.emit(int(request_id), value))
+        QTimer.singleShot(0, lambda: emit(self.asyncResponse, int(request_id), value))
 
     def blocking_context(self) -> dict:
         return {}

@@ -52,6 +52,12 @@ def _app():
         sys.stderr.write(msg + "\n")
     qInstallMessageHandler(_qt_log)
     app = QApplication.instance() or QApplication(sys.argv[:1])
+    from .qtfix import emit_leak
+    if emit_leak():
+        import PySide6
+        print(f"[icue-linux] PySide6 {PySide6.__version__} on Python {sys.version.split()[0]} has a "
+              "signal refcount bug; working around it. To remove the need:  "
+              "pip install 'PySide6<6.12'", file=sys.stderr)
     app.setApplicationName("icue-linux")
     app.setDesktopFileName("icue-linux")      # Wayland app_id: lets the GNOME extension recognise us
     return app

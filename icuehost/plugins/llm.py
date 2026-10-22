@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from .base import PluginBase
+from ..qtfix import emit
 
 HISTORY = 90          # samples kept for sparklines
 GEN_SECONDS = ("llamacpp:tokens_predicted_seconds_total",)
@@ -138,7 +139,7 @@ def _fetch(url: str, timeout: float):
 
 def _fetch_job(plugin, watch, url, timeout, cb):
     result = _fetch(url, timeout)
-    plugin._fetched.emit((watch, cb, result))     # queued to the Qt thread
+    emit(plugin._fetched, (watch, cb, result))     # queued to the Qt thread
 
 
 class _Watch(QObject):
@@ -344,7 +345,7 @@ class _Watch(QObject):
         point["prompt"] = round(prompt_tps, 2) if prompt_tps is not None else None
         self.history.append(point)
         st["history"] = list(self.history)
-        self.p.statsUpdated.emit(self.base, json.dumps(st))
+        emit(self.p.statsUpdated, self.base, json.dumps(st))
 
 
 

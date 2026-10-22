@@ -197,6 +197,14 @@ This loads `examples/sysinfo-widget` against the fake sysfs tree in `tests/fakes
 the event order, async plugin calls, signal delivery, live property updates, `tr()`,
 localStorage and the `iCUE`/`device` globals from inside the page.
 
+## Known issue: PySide6 6.12.0 on Python 3.10/3.11
+
+PySide6 6.12.0 drops a reference to Python's `True` object on every signal emit. On Python
+3.12+ that's harmless, but on older Python (Ubuntu 22.04 ships 3.10) the process eventually
+aborts with `free(): invalid pointer` after 20-30 minutes. icue-linux detects this at startup
+and compensates (you'll see a one-line notice), and `setup.py` asks for PySide6 < 6.12 on
+Python < 3.12. To remove the workaround's need entirely: `pip install 'PySide6<6.12'`.
+
 ## Known gaps
 
 - Corsair's built-in widgets may use undocumented internals; third-party widgets written to

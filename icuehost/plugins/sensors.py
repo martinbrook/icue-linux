@@ -19,6 +19,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer, Signal, Slot
 
 from .base import PluginBase
+from ..qtfix import emit
 
 ROOT = Path(os.environ.get("ICUE_LINUX_SYSFS_ROOT", "/"))
 
@@ -77,7 +78,7 @@ class SensorsPlugin(PluginBase):
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
-        self.poll(emit=False)
+        self.poll(notify=False)
 
     def start(self) -> None:
         self._timer.start()
@@ -201,26 +202,26 @@ class SensorsPlugin(PluginBase):
         return "°F" if self.fahrenheit else "°C"
 
     # ----------------------------------------------------------------- polling
-    def poll(self, emit: bool = True) -> None:
+    def poll(self, notify: bool = True) -> None:
         seen = set()
         for s, val in self._scan():
             s.value = _fmt(val)
             seen.add(s.id)
             old = self.sensors.get(s.id)
             self.sensors[s.id] = s
-            if not emit:
+            if not notify:
                 continue
             if old is None:
-                self.sensorAdded.emit(s.id)
+                emit(self.sensorAdded, s.id)
             elif old.units != s.units:
-                self.sensorUnitsChanged.emit(s.id, s.units)
+                emit(self.sensorUnitsChanged, s.id, s.units)
             if old is None or old.value != s.value:
-                self.sensorValueChanged.emit(s.id, s.value)
-                self.sensorDataChanged.emit(s.id)
+                emit(self.sensorValueChanged, s.id, s.value)
+                emit(self.sensorDataChanged, s.id)
         for gone in set(self.sensors) - seen:
             del self.sensors[gone]
-            if emit:
-                self.sensorRemoved.emit(gone)
+            if notify:
+                emit(self.sensorRemoved, gone)
 
     def blocking_context(self) -> dict:
         return {"sensors": [{"id": s.id, "type": s.type, "kind": s.kind}

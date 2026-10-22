@@ -40,6 +40,7 @@ except ModuleNotFoundError:              # Python 3.10
 from PySide6.QtCore import QFileSystemWatcher, QTimer, Signal, Slot
 
 from .base import PluginBase
+from ..qtfix import emit
 
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "icue-linux"
 EXAMPLE = Path(__file__).resolve().parent.parent / "deck.example.toml"
@@ -248,7 +249,7 @@ class DeckPlugin(PluginBase):
             if str(d["path"]) == path:
                 # editors replace files; re-add the watch after the rename settles
                 QTimer.singleShot(150, lambda p=profile: (self._load(p),
-                                                          self.deckChanged.emit(p, self._public(p))))
+                                                          emit(self.deckChanged, p, self._public(p))))
 
     # --------------------------------------------------------------- API
     @Slot(int, str)
@@ -271,7 +272,7 @@ class DeckPlugin(PluginBase):
         result = json.dumps({"page": page, "index": index, "ok": ok, "message": msg})
         if rid >= 0:
             self.respond(rid, result)
-        self.pressed.emit(profile, result)
+        emit(self.pressed, profile, result)
 
     # ----------------------------------------------------------- actions
     def _dry(self, d) -> bool:
@@ -339,7 +340,7 @@ class DeckPlugin(PluginBase):
         if "spotify" in b or "media" in b:
             return self._media(d, b)
         if "page" in b:
-            self.pageRequested.emit(profile, str(b["page"]))
+            emit(self.pageRequested, profile, str(b["page"]))
             return True, ""
         return False, "button has no action"
 
@@ -395,7 +396,7 @@ class DeckPlugin(PluginBase):
                 info["loop"] = info["spotify"].get("loop", "")
         if info != self.media:
             self.media = info
-            self.mediaChanged.emit(json.dumps(info))
+            emit(self.mediaChanged, json.dumps(info))
 
     @Slot(int)
     def getMedia(self, rid: int):

@@ -11,6 +11,7 @@ from PySide6.QtCore import Property, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 
 from .base import PluginBase
+from ..qtfix import emit
 
 
 def _playerctl(*args: str) -> str:
@@ -46,10 +47,10 @@ class MediaPlugin(PluginBase):
         song, _, artist = out.partition("\t")
         if song != self._song:
             self._song = song
-            self.songNameChanged.emit()
+            emit(self.songNameChanged)
         if artist != self._artist:
             self._artist = artist
-            self.artistChanged.emit()
+            emit(self.artistChanged)
 
     def _get_song(self): return self._song
     def _get_artist(self): return self._artist
@@ -123,13 +124,13 @@ class FpsPlugin(PluginBase):
             pass
         if avail != self._avail:
             self._avail = avail
-            self.fpsAvailabilityChanged.emit(avail); self.fpsAvailableChanged.emit()
+            emit(self.fpsAvailabilityChanged, avail); emit(self.fpsAvailableChanged)
         if fps != self._fps:
             self._fps = fps
-            self.fpsUpdated.emit(fps); self.currentFpsChanged.emit()
+            emit(self.fpsUpdated, fps); emit(self.currentFpsChanged)
         if proc != self._proc:
             self._proc = proc
-            self.processChanged.emit(proc); self.currentProcessChanged.emit()
+            emit(self.processChanged, proc); emit(self.currentProcessChanged)
 
     currentFps = Property(int, lambda s: s._fps, notify=currentFpsChanged)
     fpsAvailable = Property(bool, lambda s: s._avail, notify=fpsAvailableChanged)
