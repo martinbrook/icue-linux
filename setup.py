@@ -4,6 +4,7 @@ from setuptools import setup
 setup(
     name="icue-linux",
     version="0.1.0",
+    license="MIT",
     packages=["icuehost", "icuehost.plugins"],
     package_data={"icuehost": ["shim.js", "deck.example.toml", "gnome/*.in"]},
     python_requires=">=3.10",

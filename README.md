@@ -216,3 +216,8 @@ Python < 3.12. To remove the workaround's need entirely: `pip install 'PySide6<6
   generated settings panel.
 - The medium (1688x344) and large (840x696) slot sizes are derived from the documented small
   and XL sizes. Check them on the device.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Corsair, iCUE and Xeneon are trademarks of Corsair; this project
+isn't affiliated with or endorsed by Corsair or Elgato.
