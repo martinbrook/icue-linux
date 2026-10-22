@@ -33,7 +33,7 @@ Qt signal/slot plugin objects. icue-linux does the same with PySide6:
 ## Install
 
 ```sh
-pip install PySide6          # 6.9+; includes QtWebEngine and QtWebChannel
+pip install PySide6          # 6.9+; includes QtWebEngine and QtWebChannel (Python 3.10+)
 sudo apt install playerctl   # optional, for the Media plugin
 ```
 

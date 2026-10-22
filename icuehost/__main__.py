@@ -10,7 +10,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tomllib
+try:
+    import tomllib                      # Python 3.11+
+except ModuleNotFoundError:             # 3.10: pip install tomli
+    import tomli as tomllib
 from pathlib import Path
 
 # The Edge slot sizes iCUE uses (horizontal); vertical swaps them.
