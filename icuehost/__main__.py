@@ -48,6 +48,15 @@ def _app():
     return app
 
 
+def _no_focus(w):
+    """Touching the Edge must not take keyboard focus from the app you're working
+    in, or Deck keystrokes would land on the Edge itself. Honoured on X11 and by
+    most Wayland compositors for this window type."""
+    from PySide6.QtCore import Qt
+    w.setWindowFlag(Qt.WindowType.WindowDoesNotAcceptFocus, True)
+    w.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+
+
 def cmd_info(a):
     app = _app()  # noqa: F841  (QJSEngine/QObjects need an app)
     from .host import WidgetInstance
@@ -67,6 +76,8 @@ def cmd_preview(a):
     inst = WidgetInstance(a.widget, PluginHub(a.temp_unit), instance=a.instance,
                           language=a.lang, overrides=_kv(a.set))
     v = WidgetView(inst)
+    if not a.focus:
+        _no_focus(v)
     from PySide6.QtGui import QColor
     v.page().setBackgroundColor(QColor(a.background))   # the Edge's dark canvas
     v.setWindowTitle(inst.title)
@@ -111,6 +122,8 @@ def cmd_run(a):
     win = QWidget()
     win.setWindowTitle("icue-linux")
     win.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnBottomHint)
+    if not disp.get("take_focus", False):
+        _no_focus(win)
     win.setStyleSheet(f"background:{disp.get('background', '#000')};")
     win.setGeometry(screen.geometry())
     win.views = []
@@ -142,6 +155,7 @@ def main(argv=None):
     p.add_argument("--instance"); p.add_argument("--set", action="append")
     p.add_argument("--settings", action="store_true", help="open the generated settings panel")
     p.add_argument("--background", default="#000000")
+    p.add_argument("--focus", action="store_true", help="let the preview window take keyboard focus")
     p.set_defaults(fn=cmd_preview)
     p = sub.add_parser("info"); p.add_argument("widget"); p.add_argument("--instance")
     p.set_defaults(fn=cmd_info)

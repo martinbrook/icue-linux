@@ -1,0 +1,123 @@
+# icue-linux deck — the buttons for the "Deck" widget on the Xeneon Edge.
+# Saved changes appear on the Edge immediately. Full reference: README → Deck widget.
+#
+# Each button needs a label (or icon) and ONE action:
+#   app = "firefox"                  launch a desktop app by .desktop id, or a binary
+#   command = ["code", "~/src"]      run a program (no shell)
+#   shell = "notify-send hi"         run through /bin/sh -c
+#   url = "https://…"                open a URL, file or folder
+#   keys = "ctrl+alt+t"              key chord (or a list of chords)
+#   text = "hello"                   type text
+#   spotify = "play-pause"           play-pause | next | previous | volume-up | volume-down |
+#                                    shuffle | repeat | now-playing (tile with album art)
+#   media = "play-pause"             same, for whichever player is active
+#   page = "Media"                   switch page
+# Optional: icon (built-in name, an emoji, or an image path), color, span (columns wide).
+# Built-in icons: play pause next previous volume-up volume-down mute shuffle repeat music
+#   terminal globe folder code mail chat calendar calculator camera lock settings power
+#   sun moon keyboard home plus grid
+
+[deck]
+# key_backend = "ydotool"     # xdotool | wtype | ydotool (default: detected)
+# dry_run = true              # log actions instead of running them
+# spotify_command = "flatpak run com.spotify.Client"
+
+[[page]]
+name = "Main"
+
+  [[page.button]]
+  spotify = "now-playing"
+  span = 2
+
+  [[page.button]]
+  label = "Previous"
+  icon = "previous"
+  spotify = "previous"
+
+  [[page.button]]
+  label = "Play"
+  icon = "play"
+  spotify = "play-pause"
+
+  [[page.button]]
+  label = "Next"
+  icon = "next"
+  spotify = "next"
+
+  [[page.button]]
+  label = "Terminal"
+  icon = "terminal"
+  keys = "ctrl+alt+t"
+  color = "#1f2937"
+
+  [[page.button]]
+  label = "Firefox"
+  icon = "globe"
+  app = "firefox"
+  color = "#7c2d12"
+
+  [[page.button]]
+  label = "Files"
+  icon = "folder"
+  app = "org.gnome.Nautilus"
+  color = "#1e3a8a"
+
+  [[page.button]]
+  label = "VS Code"
+  icon = "code"
+  app = "code"
+  color = "#0c4a6e"
+
+  [[page.button]]
+  label = "Screenshot"
+  icon = "camera"
+  keys = "print"
+
+  [[page.button]]
+  label = "More"
+  icon = "grid"
+  page = "Tools"
+
+[[page]]
+name = "Tools"
+
+  [[page.button]]
+  label = "Back"
+  icon = "home"
+  page = "Main"
+
+  [[page.button]]
+  label = "Vol −"
+  icon = "volume-down"
+  spotify = "volume-down"
+
+  [[page.button]]
+  label = "Vol +"
+  icon = "volume-up"
+  spotify = "volume-up"
+
+  [[page.button]]
+  label = "Shuffle"
+  icon = "shuffle"
+  spotify = "shuffle"
+
+  [[page.button]]
+  label = "Copy"
+  icon = "📋"
+  keys = "ctrl+c"
+
+  [[page.button]]
+  label = "Paste"
+  icon = "📌"
+  keys = "ctrl+v"
+
+  [[page.button]]
+  label = "Lock"
+  icon = "lock"
+  keys = "super+l"
+  color = "#3f1d1d"
+
+  [[page.button]]
+  label = "Settings"
+  icon = "settings"
+  app = "gnome-control-center"

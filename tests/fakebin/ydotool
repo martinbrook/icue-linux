@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "ydotool $*" >> "$FAKE_STATE/calls"

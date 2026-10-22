@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "xdg-open $*" >> "$FAKE_STATE/calls"

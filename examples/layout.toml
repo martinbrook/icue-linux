@@ -30,3 +30,11 @@ values = { layout = "text", textColor = "#4fc3f7" }   # optional property overri
 # x = 1708
 # y = 12
 # values = { serverUrl = "http://corsair-300:8731", displayName = "Corsair 300" }
+
+# Stream Deck-style buttons (see README: Deck widget); buttons in ~/.config/icue-linux/deck.toml
+# [[widget]]
+# path = "examples/deck"
+# instance = "deck"
+# size = "xl"
+# x = 12
+# y = 12

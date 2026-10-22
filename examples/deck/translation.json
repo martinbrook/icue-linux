@@ -1,0 +1,5 @@
+{ "en": { "translation": { "Deck": "Deck", "Profile": "Profile", "Deck file": "Deck file", "Appearance": "Appearance",
+  "Accent Color": "Accent Color", "Button Color": "Button Color", "Background": "Background",
+  "Background Transparency": "Background Transparency", "Show labels": "Show labels",
+  "Nothing playing": "Nothing playing", "Spotify is closed": "Spotify is closed · tap to open",
+  "needs icue-linux": "This widget needs the icue-linux host" } } }

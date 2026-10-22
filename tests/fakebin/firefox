@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "firefox $*" >> "$FAKE_STATE/calls"

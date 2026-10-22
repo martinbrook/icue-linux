@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>tr('Deck')</title>
+  <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
+
+  <meta name="x-icue-property" content="profile" data-label="tr('Deck file')" data-type="textfield" data-default="'deck'" />
+  <meta name="x-icue-property" content="showLabels" data-label="tr('Show labels')" data-type="switch" data-default="true" />
+  <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#7dd3fc'" />
+  <meta name="x-icue-property" content="buttonColor" data-label="tr('Button Color')" data-type="color" data-default="'#1a1f27'" />
+  <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background')" data-type="color" data-default="'#0b0f14'" />
+  <meta name="x-icue-property" content="transparency" data-label="tr('Background Transparency')" data-type="slider" data-default="100" data-min="0" data-max="100" data-step="1" />
+  <script type="application/json" id="x-icue-groups">
+    [
+      { "title": "tr('Profile')", "properties": ["profile", "showLabels"] },
+      { "title": "tr('Appearance')", "properties": ["accentColor", "buttonColor", "backgroundColor", "transparency"] }
+    ]
+  </script>
+  <link rel="stylesheet" href="styles/deck.css" />
+  <script src="scripts/icons.js"></script>
+</head>
+<body>
+  <div class="bgfill"></div>
+  <div class="wrap" id="wrap">
+    <nav class="pages hidden" id="pages"></nav>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div class="notice hidden" id="notice"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const T = { "Nothing playing": "Nothing playing", "Spotify is closed": "Spotify is closed · tap to open",
+                "needs icue-linux": "This widget needs the icue-linux host" };
+    let deck = null, pageIdx = 0, media = {}, current = "";
+    let rid = Math.floor(Math.random() * 1e8);          // the plugin is shared between widgets
+    const pending = new Map();
+
+    function P() { return window.plugins && window.plugins.Deck; }
+    function ask(method, ...args) {
+      return new Promise((res) => { const id = rid++; pending.set(id, res); P()[method](id, ...args); });
+    }
+
+    function applyStyle() {
+      const r = document.documentElement.style;
+      const st = (deck && deck.style) || {};
+      r.setProperty("--accent", accentColor);
+      r.setProperty("--button", st.button_color || buttonColor);
+      r.setProperty("--bg", backgroundColor);
+      r.setProperty("--bg-opacity", Math.max(0, Math.min(100, Number(transparency))) / 100);
+      document.body.classList.toggle("nolabels", !showLabels || st.labels === false);
+    }
+
+    function iconHtml(icon, fallbackLabel) {
+      if (!icon) icon = "";
+      if (DECK_ICONS[icon]) return `<svg viewBox="0 0 24 24">${DECK_ICONS[icon]}</svg>`;
+      if (/\.(svg|png|jpe?g|webp|gif)$/i.test(icon)) {
+        const src = /^(https?|file):/.test(icon) ? icon : "file://" + icon.replace(/^~/, "");
+        return `<img src="${encodeURI(src)}" alt="">`;
+      }
+      if (icon) return `<span class="emoji">${escapeHtml(icon)}</span>`;
+      return `<span class="emoji">${escapeHtml((fallbackLabel || "?").slice(0, 2))}</span>`;
+    }
+    const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+    // ------------------------------------------------------------- layout
+    function layout(page) {
+      // Pick the row count that gives the biggest buttons for this slot, then
+      // keep buttons from getting wider than ~1.6:1 by allowing spare columns.
+      const g = $("grid");
+      const W = g.clientWidth, H = g.clientHeight;
+      const gap = parseFloat(getComputedStyle(g).columnGap) || 8;
+      const span = Math.max(1, page.buttons.reduce((n, b) => n + Math.max(1, b.span), 0));
+      let best = { size: -1, rows: 1, cols: span };
+      for (let r = 1; r <= 6; r++) {
+        if (page.rows && r !== page.rows) continue;
+        const c = page.columns || Math.ceil(span / r);
+        if (c * r < span) continue;
+        const cw = (W - gap * (c - 1)) / c, ch = (H - gap * (r - 1)) / r;
+        const size = Math.min(cw, ch);
+        if (size > best.size + 0.5) best = { size, rows: r, cols: c };
+      }
+      let { rows, cols } = best;
+      if (!page.columns) {
+        const ch = (H - gap * (rows - 1)) / rows;
+        cols = Math.max(cols, Math.floor((W + gap) / (ch * 1.6 + gap)));
+      }
+      g.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      g.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+    }
+
+    function render() {
+      if (!deck) return;
+      const pages = deck.pages || [];
+      pageIdx = Math.min(pageIdx, Math.max(0, pages.length - 1));
+      const nav = $("pages");
+      nav.classList.toggle("hidden", pages.length < 2);
+      nav.innerHTML = "";
+      pages.forEach((p, i) => {
+        const t = document.createElement("button");
+        t.className = "tab" + (i === pageIdx ? " on" : "");
+        t.textContent = p.name;
+        t.addEventListener("pointerup", () => { pageIdx = i; render(); });
+        nav.appendChild(t);
+      });
+      const g = $("grid");
+      g.innerHTML = "";
+      const page = pages[pageIdx];
+      if (!page) { showNotice(deck.error || `No pages in ${deck.file}`); return; }
+      hideNotice();
+      layout(page);
+      page.buttons.forEach((b, i) => {
+        const el = document.createElement("button");
+        el.className = "btn";
+        el.dataset.index = i;
+        if (b.span > 1) el.style.gridColumn = `span ${b.span}`;
+        if (b.color) el.style.background = b.color;
+        if (b.kind === "spotify" || b.kind === "media") el.dataset.verb = b.verb, el.dataset.player = b.player;
+        if (b.verb === "now-playing") {
+          el.classList.add("np");
+          el.innerHTML = `<div class="art"><svg viewBox="0 0 24 24">${DECK_ICONS.music}</svg></div>
+            <div class="meta"><div class="t"></div><div class="a"></div><div class="st"></div></div>`;
+        } else {
+          el.innerHTML = `<div class="ico">${iconHtml(b.icon, b.label)}</div><div class="lbl">${escapeHtml(b.label)}</div>`;
+        }
+        bindPress(el, i);
+        g.appendChild(el);
+      });
+      if (deck.error) toast(deck.error);
+      renderMedia();
+    }
+
+    function bindPress(el, index) {
+      let down = false;
+      el.addEventListener("pointerdown", (e) => { down = true; el.classList.add("down"); el.setPointerCapture(e.pointerId); });
+      el.addEventListener("pointercancel", () => { down = false; el.classList.remove("down"); });
+      el.addEventListener("pointerup", (e) => {
+        el.classList.remove("down");
+        const r = el.getBoundingClientRect();
+        const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+        if (down && inside) press(index);
+        down = false;
+      });
+    }
+
+    async function press(index) {
+      if (!P()) return;
+      const res = JSON.parse(await ask("press", current, pageIdx, index));
+      flash(index, res.ok);
+      if (!res.ok && res.message) toast(res.message);
+    }
+
+    function flash(index, ok) {
+      const el = $("grid").children[index];
+      if (!el) return;
+      el.classList.add(ok ? "ok" : "fail");
+      setTimeout(() => el.classList.remove("ok", "fail"), ok ? 350 : 1600);
+    }
+    let toastTimer;
+    function toast(msg) {
+      $("toast").textContent = msg; $("toast").classList.add("show");
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("show"), 3500);
+    }
+    function showNotice(msg) { $("notice").textContent = msg; $("notice").classList.remove("hidden"); }
+    function hideNotice() { $("notice").classList.add("hidden"); }
+
+    // -------------------------------------------------------------- media
+    function renderMedia() {
+      const sp = media.spotify, any = sp || media.any;
+      for (const el of $("grid").querySelectorAll("[data-verb]")) {
+        const info = el.dataset.player === "spotify" ? sp : any;
+        const playing = info && info.status === "Playing";
+        const verb = el.dataset.verb;
+        if (verb === "play-pause") {
+          const ico = el.querySelector(".ico");
+          const b = deck.pages[pageIdx].buttons[+el.dataset.index];
+          if (!b.icon || b.icon === "play" || b.icon === "pause") ico.innerHTML = iconHtml(playing ? "pause" : "play");
+          el.classList.toggle("active", !!playing);
+        } else if (verb === "shuffle") {
+          el.classList.toggle("active", info && info.shuffle === "true");
+        } else if (verb === "now-playing") {
+          el.classList.toggle("paused", !playing);
+          const art = el.querySelector(".art");
+          if (info && info.art) { art.style.backgroundImage = `url("${info.art.replace(/"/g, "%22")}")`; art.innerHTML = ""; }
+          else { art.style.backgroundImage = ""; art.innerHTML = `<svg viewBox="0 0 24 24">${DECK_ICONS.music}</svg>`; }
+          const closed = el.dataset.player === "spotify" && !media.running;
+          el.querySelector(".t").textContent = info && info.title ? info.title : (closed ? T["Spotify is closed"] : T["Nothing playing"]);
+          el.querySelector(".a").textContent = info ? info.artist : (media.error || "");
+          el.querySelector(".st").innerHTML = info
+            ? (playing ? `<span class="eq"><i></i><i></i><i></i></span> ${escapeHtml(info.player || "")}`
+                       : `<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> ${escapeHtml(info.status)}`)
+            : "";
+        }
+      }
+    }
+
+    // --------------------------------------------------------- lifecycle
+    async function loadDeck() {
+      current = String(profile || "deck");
+      deck = JSON.parse(await ask("getDeck", current));
+      applyStyle();
+      render();
+    }
+
+    pluginDeckEvents = {
+      onInitialized: async () => {
+        const D = P();
+        D.asyncResponse.connect((id, v) => { const f = pending.get(id); if (f) { pending.delete(id); f(v); } });
+        D.deckChanged.connect((prof, json) => { if (prof === current) { deck = JSON.parse(json); applyStyle(); render(); } });
+        D.pageRequested.connect((prof, name) => {
+          if (prof !== current) return;
+          const i = deck.pages.findIndex(p => p.name === name);
+          if (i >= 0) { pageIdx = i; render(); } else toast(`No page called "${name}"`);
+        });
+        D.mediaChanged.connect((json) => { media = JSON.parse(json); renderMedia(); });
+        media = JSON.parse(await ask("getMedia") || "{}");
+        await loadDeck();
+      },
+    };
+
+    icueEvents = {
+      onICUEInitialized: async () => {
+        for (const k of Object.keys(T)) T[k] = await tr(k);
+        if (typeof pluginDeck_initialized === "undefined") showNotice(T["needs icue-linux"]);
+      },
+      onDataUpdated: () => {
+        applyStyle();
+        if (P() && deck && String(profile || "deck") !== current) loadDeck();
+        else if (deck) render();
+      },
+    };
+    if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) { icueEvents.onICUEInitialized(); icueEvents.onDataUpdated(); }
+    if (typeof pluginDeck_initialized !== "undefined" && pluginDeck_initialized) pluginDeckEvents.onInitialized();
+
+    // swipe between pages
+    let sx = null;
+    $("grid").addEventListener("pointerdown", (e) => { sx = e.clientX; });
+    $("grid").addEventListener("pointerup", (e) => {
+      if (sx == null || !deck) return;
+      const dx = e.clientX - sx; sx = null;
+      if (Math.abs(dx) > $("grid").clientWidth * 0.25) {
+        pageIdx = (pageIdx + (dx < 0 ? 1 : -1) + deck.pages.length) % deck.pages.length;
+        render();
+      }
+    });
+    window.addEventListener("resize", () => deck && render());
+  </script>
+</body>
+</html>

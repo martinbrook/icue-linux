@@ -58,6 +58,53 @@ names from unknown engines are matched by suffix (`..._generation_tokens_total`,
 llama.cpp naming are picked up automatically. Test without a real server:
 `python tests/fake_llm_server.py vllm 18000`.
 
+## Deck widget (Stream Deck-style buttons)
+
+`examples/deck` turns the Edge into a touch button grid. Buttons live in
+`~/.config/icue-linux/deck.toml`, which is created from a commented example the first time the
+widget runs. Saved edits show up on the Edge straight away. The widget only reports which
+button was pressed, and the host looks up what to do in that file, so nothing on the display
+can run commands of its own.
+
+```toml
+[[page]]
+name = "Main"
+  [[page.button]]
+  spotify = "now-playing"     # album-art tile; tap = play/pause; opens Spotify if closed
+  span = 2
+  [[page.button]]
+  label = "Firefox"
+  icon = "globe"              # built-in icon, an emoji, or an image path
+  app = "firefox"             # .desktop id or binary
+  [[page.button]]
+  label = "Terminal"
+  keys = "ctrl+alt+t"         # or a list of chords
+```
+
+Actions: `app`, `command` (no shell), `shell`, `url`, `keys`, `text`, `spotify` / `media`
+(`play-pause`, `next`, `previous`, `volume-up`, `volume-down`, `shuffle`, `repeat`,
+`now-playing`) and `page`. Pages appear as tabs down the left; swipe to change page. The
+grid sizes itself to the widget slot. Put `columns` / `rows` on a page to fix it. Use a
+different file per instance with the widget's **Deck file** setting (`media` →
+`~/.config/icue-linux/media.toml`).
+
+**What to install**
+
+| For | Package |
+|---|---|
+| Spotify / media buttons | `playerctl` |
+| Keystrokes on X11 | `xdotool` |
+| Keystrokes on KDE / wlroots Wayland | `wtype` |
+| Keystrokes on GNOME Wayland | `ydotool` and its `ydotoold` service (needs access to `/dev/uinput`) |
+
+The key tool is detected automatically. Override it with `[deck] key_backend = "..."`. Use
+`[deck] dry_run = true` to log actions instead of running them.
+
+**Keyboard focus:** windows on the Edge ask not to take focus, so keystrokes go to the app you
+were using rather than to the deck. X11 and KDE honour this. GNOME on Wayland may still focus
+the Edge on touch; if a keystroke button seems to do nothing there, that's why. App, URL and
+Spotify buttons aren't affected.
+
 ## Install
 
 ```sh

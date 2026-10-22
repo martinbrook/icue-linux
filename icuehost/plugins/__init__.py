@@ -2,6 +2,7 @@ from .base import PluginBase
 from .others import REGISTRY as _OTHERS, StubPlugin
 from .sensors import SensorsPlugin
 from .llm import LlmMonitorPlugin
+from .deck import DeckPlugin
 
 
 class PluginHub:
@@ -10,7 +11,8 @@ class PluginHub:
     def __init__(self, temperature_unit: str = "°C"):
         self._factories = {"widgetbuilder.sensorsdataprovider":
                            lambda: SensorsPlugin(temperature_unit=temperature_unit),
-                           "icuelinux.llmmonitor": LlmMonitorPlugin, **_OTHERS}
+                           "icuelinux.llmmonitor": LlmMonitorPlugin,
+                           "icuelinux.deck": DeckPlugin, **_OTHERS}
         self._instances: dict[str, PluginBase] = {}
 
     def get(self, module: str) -> PluginBase:
