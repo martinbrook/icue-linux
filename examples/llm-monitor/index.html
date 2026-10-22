@@ -110,7 +110,8 @@
       }
       $("gen").textContent = big;
       $("genLabel").textContent = label;
-      $("prompt").textContent = s.promptTps == null ? "–" : fmt(s.promptTps);
+      const ptps = s.promptTps != null ? s.promptTps : (!live ? s.lastPromptTps : null);
+      $("prompt").textContent = ptps == null ? "–" : fmt(ptps);
 
       $("running").textContent = s.running == null ? "–" : Math.round(s.running) + (s.slotsTotal ? `/${s.slotsTotal}` : "");
       $("waiting").textContent = s.waiting == null ? "–" : Math.round(s.waiting);

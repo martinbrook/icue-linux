@@ -27,6 +27,12 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequ
 from .base import PluginBase
 
 HISTORY = 90          # samples kept for sparklines
+GEN_SECONDS = ("llamacpp:tokens_predicted_seconds_total",)
+PROMPT_SECONDS = ("llamacpp:prompt_seconds_total",)
+
+
+def _first(m: dict, names) -> float | None:
+    return next((m[n] for n in names if n in m), None)
 MODELS_EVERY = 15     # seconds between /v1/models checks while /metrics works
 
 _LINE = re.compile(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+0-9.eEInfNa]+)')
@@ -134,6 +140,8 @@ class _Watch(QObject):
         self.prev_running = 0
         self.busy_since: float | None = None     # wall-clock time the current request started
         self.last_tps: float | None = None
+        self.last_prompt_tps: float | None = None
+        self.prev_secs: tuple[float | None, float | None] = (None, None)   # predict, prompt seconds
         self.pending = 0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
@@ -214,7 +222,15 @@ class _Watch(QObject):
         except (ValueError, AttributeError, TypeError):
             self.state["hasSlots"] = False
 
-    def _burst(self, st, m, r, dg, dp, dt, running):
+    def _sec_deltas(self, m):
+        """Seconds the server spent generating / processing prompts since the last poll."""
+        out = []
+        for names, prev in ((GEN_SECONDS, self.prev_secs[0]), (PROMPT_SECONDS, self.prev_secs[1])):
+            cur = _first(m, names)
+            out.append(cur - prev if cur is not None and prev is not None and cur >= prev else None)
+        return tuple(out)
+
+    def _burst(self, st, m, r, dg, dp, dt, running, secs=(None, None)):
         """Rates for servers whose counters only move when a request completes."""
         now = r["t"]
         if running > 0 and self.busy_since is None:
@@ -223,10 +239,15 @@ class _Watch(QObject):
             idle = 0.0 if running == 0 else None      # unknown while a request runs
             return idle, idle
         # a request just finished: work out its rate
+        # Best: tokens / the server's own generation time for those tokens (exact,
+        # and unaffected by other scrapers). Then the per-scrape gauge, then wall time.
+        gen_secs, prompt_secs = secs
         metric = next((m[k] for k in ("llamacpp:predicted_tokens_seconds", "predicted_tokens_seconds")
                        if m.get(k)), None)
         duration = now - self.busy_since if self.busy_since is not None else None
-        if metric:
+        if gen_secs and gen_secs > 0:
+            rate = dg / gen_secs
+        elif metric:
             rate = metric
         elif duration and duration > 0.5:
             rate = dg / duration
@@ -239,8 +260,13 @@ class _Watch(QObject):
                     if pt["t"] >= self.busy_since:
                         pt["gen"] = round(rate, 2)
         self.busy_since = now if running > 0 else None
-        ptps = next((m[k] for k in ("llamacpp:prompt_tokens_seconds", "prompt_tokens_seconds")
-                     if m.get(k)), None)
+        if dp > 0 and prompt_secs and prompt_secs > 0:
+            ptps = dp / prompt_secs
+        else:
+            ptps = next((m[k] for k in ("llamacpp:prompt_tokens_seconds", "prompt_tokens_seconds")
+                         if m.get(k)), None)
+        if ptps is not None:
+            self.last_prompt_tps = ptps
         return rate, ptps
 
     # --------------------------------------------------------------- publish
@@ -286,7 +312,9 @@ class _Watch(QObject):
                     gen_tps = dg / dt
                     prompt_tps = dp / dt if prompt is not None else None
                 else:
-                    gen_tps, prompt_tps = self._burst(st, m, r, dg, dp, dt, running_now)
+                    gen_tps, prompt_tps = self._burst(st, m, r, dg, dp, dt, running_now,
+                                                      self._sec_deltas(m))
+        self.prev_secs = (_first(m, GEN_SECONDS), _first(m, PROMPT_SECONDS))
         if gen is not None:
             self.prev = (now, gen, prompt or 0)
         else:
@@ -294,6 +322,7 @@ class _Watch(QObject):
         self.prev_running = running_now
         st["genTps"], st["promptTps"], st["liveRate"] = gen_tps, prompt_tps, self.live
         st["lastTps"], st["busy"] = self.last_tps, running_now > 0
+        st["lastPromptTps"] = self.last_prompt_tps
         point["gen"] = round(gen_tps, 2) if gen_tps is not None else None
         point["prompt"] = round(prompt_tps, 2) if prompt_tps is not None else None
         self.history.append(point)

@@ -95,7 +95,10 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, "\n".join([
                 "# TYPE llamacpp:prompt_tokens_total counter", f"llamacpp:prompt_tokens_total {bp}",
                 "# TYPE llamacpp:tokens_predicted_total counter", f"llamacpp:tokens_predicted_total {int(bg)}",
-                "# TYPE llamacpp:predicted_tokens_seconds gauge", "llamacpp:predicted_tokens_seconds 43.14",
+                "# TYPE llamacpp:prompt_seconds_total counter", f"llamacpp:prompt_seconds_total {bp / 616.9:.4f}",
+                "# TYPE llamacpp:tokens_predicted_seconds_total counter", f"llamacpp:tokens_predicted_seconds_total {bg / 45.0:.4f}",
+                "# TYPE llamacpp:predicted_tokens_seconds gauge", "llamacpp:predicted_tokens_seconds 0",
+                "# TYPE halogen:requests_total counter", f"halogen:requests_total {int(bg / (6 * 43.14))}",
                 "# TYPE llamacpp:requests_processing gauge", f"llamacpp:requests_processing {br}",
                 "# TYPE llamacpp:requests_deferred gauge", "llamacpp:requests_deferred 0", ""]),
                 "text/plain; version=0.0.4")

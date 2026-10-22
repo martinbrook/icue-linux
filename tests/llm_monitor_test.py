@@ -99,7 +99,7 @@ def report():
     check("metrics" in p["notice"], "models-only: explains missing throughput")
     check("down" in d["dot"] and "offline" in d["meta"].lower(), "unreachable server shown offline")
     h = results["halogen"]
-    check(h["gen"] in ("…", "43") and h["label"] in ("generating", "last request"),
+    check(h["gen"] in ("…", "45") and h["label"] in ("generating", "last request"),
           f"end-of-request counters: no spike, request rate shown ({h['gen']} / {h['label']})")
     errs = [c for v in views.values() for c in v.page().console if "rror" in c]
     check(not errs, "no JS errors" + (": " + "; ".join(errs) if errs else ""))
