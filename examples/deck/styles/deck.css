@@ -38,13 +38,15 @@ body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--tex
 .btn.active .ico { color: var(--accent); }
 
 /* now-playing tile */
-.btn.np { flex-direction: row; justify-content: flex-start; gap: 0; padding: 0; text-align: left; }
-.np .art { height: 100%; aspect-ratio: 1; max-width: 42%; background: color-mix(in srgb, var(--text) 8%, transparent) center/cover no-repeat; flex: none; display: grid; place-items: center; }
+/* The tile is its own size container so the cover can be a true square:
+   as tall as the tile, or half its width if the tile is narrow. */
+.btn.np { flex-direction: row; justify-content: flex-start; gap: 0; padding: 0; text-align: left; container-type: size; }
+.np .art { width: min(100cqh, 50cqw); height: min(100cqh, 50cqw); align-self: center; background: color-mix(in srgb, var(--text) 8%, transparent) center/cover no-repeat; flex: none; display: grid; place-items: center; border-radius: inherit; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .np .art svg { width: 38%; height: 38%; stroke: color-mix(in srgb, var(--text) 40%, transparent); stroke-width: 1.6; fill: none; }
-.np .meta { flex: 1; min-width: 0; padding: 0 3cqh; display: flex; flex-direction: column; gap: .8cqh; }
-.np .t { font-size: clamp(12px, 5.6cqh, 26px); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np .a { font-size: clamp(10px, 4.4cqh, 20px); opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np .st { display: flex; align-items: center; gap: 1cqh; font-size: clamp(9px, 3.6cqh, 16px); color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-top: .6cqh; }
+.np .meta { flex: 1; min-width: 0; padding: 0 6cqh; display: flex; flex-direction: column; gap: 1.6cqh; }
+.np .t { font-size: clamp(12px, 12cqh, 26px); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .a { font-size: clamp(10px, 9.5cqh, 20px); opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .st { display: flex; align-items: center; gap: 2cqh; font-size: clamp(9px, 7.7cqh, 16px); color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-top: .6cqh; }
 .np .st svg { width: 1.2em; height: 1.2em; fill: currentColor; }
 .np .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 1em; }
 .np .eq i { width: 3px; background: currentColor; animation: eq 1s ease-in-out infinite; }

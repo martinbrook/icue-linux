@@ -66,6 +66,7 @@ TAP = """(function(i){const b=document.querySelectorAll('#grid .btn')[i]; const 
 STATE_JS = """(function(){try{return JSON.stringify({n: document.querySelectorAll('#grid .btn').length, tab: (document.querySelector('.tab.on')||{}).textContent,
  np: (document.querySelector('.np .t')||{}).textContent, art: (document.querySelector('.np .art')||{style:{}}).style.backgroundImage,
  css: getComputedStyle(document.body).userSelect,
+ artBox: (()=>{const a=document.querySelector('.np .art'); if(!a) return null; const r=a.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)];})(),
  playIcon: (document.querySelectorAll('#grid .btn')[2]||{innerHTML:''}).innerHTML.includes('rect'), toast: document.getElementById('toast').classList.contains('show') ? document.getElementById('toast').textContent : '',
  labels: [...document.querySelectorAll('#grid .lbl')].map(e=>e.textContent), cols: document.getElementById('grid').style.gridTemplateColumns})}catch(e){return JSON.stringify({err: String(e)})}})()"""
 
@@ -82,6 +83,7 @@ def r1(r):
     check(r["n"] == 10 and r["tab"] == "Main", "Main page rendered with 10 buttons")
     check(r["np"] == "Wandering Signal" and "http://127.0.0.1:18077/art.png" in r["art"], "now-playing tile loads album art from the web")
     check(r["css"] == "none", "widget stylesheet applied alongside web access")
+    check(r["artBox"] and abs(r["artBox"][0] - r["artBox"][1]) <= 1, f"album art is square {r['artBox']}")
     check(r["playIcon"], "play button shows pause icon while playing")
     check(deck_file.exists(), "default deck.toml created from example")
 
