@@ -30,6 +30,34 @@ Qt signal/slot plugin objects. icue-linux does the same with PySide6:
 | FPS (`widgetbuilder.fpsdataprovider`) | newest MangoHud CSV log (enable MangoHud logging) |
 | Device Action, Stream Deck, anything else | present and initialised, but silent |
 
+## LLM Monitor widget
+
+`examples/llm-monitor` shows an OpenAI-compatible LLM server on the Edge: up/down, loaded
+model, latency, generation and prompt tokens/s with a sparkline, running/waiting requests
+and KV-cache use. It uses a Linux-host plugin (`icuelinux.llmmonitor`), so the polling
+happens on the Edge PC and nothing changes on the LLM machine. Under Corsair's iCUE it
+shows a notice instead.
+
+| Server exposes | Widget shows |
+|---|---|
+| `/v1/models` only | up/down, model, latency |
+| plus Prometheus `/metrics` (vLLM, llama.cpp `--metrics`, SGLang, TGI) | plus tok/s, running/waiting, KV cache |
+| plus llama.cpp `/slots` | running shown as busy/total slots |
+
+Set **Server URL** (e.g. `http://192.168.68.79:8000`; a trailing `/v1` is fine) and
+**Display name** in its settings:
+
+```sh
+icue-linux preview examples/llm-monitor --size small --settings \
+  --set serverUrl='"http://corsair-300:8731"' --set displayName='"Corsair 300"'
+```
+
+Check what your server exposes with `curl -s http://HOST:PORT/metrics | head -40`. Metric
+names from unknown engines are matched by suffix (`..._generation_tokens_total`,
+`..._num_requests_running`, `..._kv_cache_usage_perc` ...), so engines that follow vLLM or
+llama.cpp naming are picked up automatically. Test without a real server:
+`python tests/fake_llm_server.py vllm 18000`.
+
 ## Install
 
 ```sh

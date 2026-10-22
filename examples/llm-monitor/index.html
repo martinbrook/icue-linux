@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>tr('LLM Monitor')</title>
+  <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
+
+  <meta name="x-icue-property" content="serverUrl" data-label="tr('Server URL')" data-type="textfield" data-default="'http://localhost:8731'" />
+  <meta name="x-icue-property" content="displayName" data-label="tr('Display name')" data-type="textfield" data-default="'LLM'" />
+  <meta name="x-icue-property" content="pollSeconds" data-label="tr('Refresh (seconds)')" data-type="slider" data-default="2" data-min="1" data-max="10" data-step="1" />
+  <meta name="x-icue-property" content="showPrompt" data-label="tr('Show prompt rate')" data-type="switch" data-default="true" />
+  <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#e8edf2'" />
+  <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#7dd3fc'" />
+  <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background')" data-type="color" data-default="'#0b0f14'" />
+  <meta name="x-icue-property" content="transparency" data-label="tr('Background Transparency')" data-type="slider" data-default="100" data-min="0" data-max="100" data-step="1" />
+  <script type="application/json" id="x-icue-groups">
+    [
+      { "title": "tr('Server')", "properties": ["serverUrl", "displayName", "pollSeconds", "showPrompt"] },
+      { "title": "tr('Appearance')", "properties": ["textColor", "accentColor", "backgroundColor", "transparency"] }
+    ]
+  </script>
+  <link rel="stylesheet" href="styles/llm.css" />
+</head>
+<body>
+  <div class="bgfill"></div>
+  <div class="root" id="root">
+    <div class="head">
+      <span class="dot" id="dot"></span>
+      <span class="name" id="name">LLM</span>
+      <span class="model" id="model"></span>
+      <span class="meta" id="meta"></span>
+    </div>
+
+    <div class="rate" id="rateBox">
+      <div class="big"><span id="gen">–</span><span class="unit">tok/s</span></div>
+      <div class="label" id="genLabel">generating</div>
+      <div class="sub" id="promptRow"><b id="prompt">–</b> <span class="unit" style="font-size:.8em">tok/s</span> <span id="promptLabel">prompt</span></div>
+    </div>
+
+    <div class="side" id="sideBox">
+      <div class="chips">
+        <div class="chip" id="runChip"><div class="n" id="running">–</div><div class="l" id="runLabel">running</div></div>
+        <div class="chip" id="waitChip"><div class="n" id="waiting">–</div><div class="l" id="waitLabel">waiting</div></div>
+      </div>
+      <div class="kv" id="kvBox">
+        <div class="row"><span id="kvLabel">KV cache</span><span id="kvPct">–</span></div>
+        <div class="bar"><i id="kvBar"></i></div>
+      </div>
+    </div>
+
+    <div class="spark" id="sparkBox"><canvas id="spark"></canvas><span class="peak" id="peak"></span></div>
+    <div class="notice hidden" id="notice"></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    // English defaults so first paint is right; replaced by tr() at init
+    const T = { generating: "generating", prompt: "prompt", running: "running", waiting: "waiting",
+                "KV cache": "KV cache", online: "online", offline: "offline", idle: "idle",
+                connecting: "connecting…", "metrics not exposed": "throughput needs a /metrics endpoint",
+                "needs icue-linux": "This widget needs the icue-linux host" };
+    const KEYS = ["generating", "prompt", "running", "waiting", "KV cache", "online", "offline",
+                  "idle", "connecting", "metrics not exposed", "needs icue-linux"];
+    let last = null, watching = "";
+
+    function normalise(url) {
+      let u = String(url || "").trim().replace(/\/+$/, "");
+      if (u.endsWith("/v1")) u = u.slice(0, -3);
+      if (u && !/^https?:\/\//.test(u)) u = "http://" + u;
+      return u;
+    }
+    const fmt = (v, d = 1) => v == null ? "–" : v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(v < 10 ? d : 0);
+
+    function applyStyle() {
+      const r = document.documentElement.style;
+      r.setProperty("--text", textColor);
+      r.setProperty("--accent", accentColor);
+      r.setProperty("--bg", backgroundColor);
+      r.setProperty("--bg-opacity", Math.max(0, Math.min(100, Number(transparency))) / 100);
+      $("name").textContent = displayName || "LLM";
+      $("promptRow").classList.toggle("hidden", !showPrompt);
+    }
+
+    function render(s) {
+      last = s;
+      const up = !!s.up;
+      const busy = up && ((s.running || 0) > 0 || (s.genTps || 0) > 0.05);
+      $("root").classList.toggle("down", !up);
+      $("dot").className = "dot " + (up ? "up" : "down") + (busy ? " busy" : "");
+      $("model").textContent = (s.models && s.models[0]) ? s.models.join(", ") : "";
+      const bits = [];
+      if (s.engine) bits.push(s.engine);
+      bits.push(up ? `${s.latencyMs} ms` : (T.offline + (s.error ? ` · ${s.error}` : "")));
+      $("meta").textContent = bits.join(" · ");
+
+      const hasRate = s.genTotal != null;
+      const noticeOn = up && !s.hasMetrics && s.running == null;
+      $("notice").textContent = noticeOn ? T["metrics not exposed"] : "";
+      $("notice").classList.toggle("hidden", !noticeOn);
+      for (const id of ["rateBox", "sideBox", "sparkBox"]) $(id).classList.toggle("hidden", noticeOn);
+
+      $("gen").textContent = hasRate ? fmt(s.genTps || 0) : "–";
+      $("genLabel").textContent = !up ? T.offline : busy ? T.generating : T.idle;
+      $("prompt").textContent = s.promptTps == null ? "–" : fmt(s.promptTps);
+
+      $("running").textContent = s.running == null ? "–" : Math.round(s.running) + (s.slotsTotal ? `/${s.slotsTotal}` : "");
+      $("waiting").textContent = s.waiting == null ? "–" : Math.round(s.waiting);
+      $("waitChip").classList.toggle("warn", (s.waiting || 0) > 0);
+      $("waitChip").classList.toggle("hidden", s.waiting == null);
+      const kv = s.kvUsage;
+      $("kvBox").classList.toggle("hidden", kv == null);
+      if (kv != null) {
+        $("kvPct").textContent = Math.round(kv * 100) + "%";
+        $("kvBar").style.width = Math.min(100, kv * 100) + "%";
+        $("kvBar").classList.toggle("hot", kv > 0.9);
+      }
+      drawSpark(s.history || []);
+    }
+
+    function drawSpark(hist) {
+      const c = $("spark"), box = $("sparkBox");
+      const dpr = window.devicePixelRatio || 1;
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h) return;
+      c.width = w * dpr; c.height = h * dpr;
+      const g = c.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+      const css = getComputedStyle(document.documentElement);
+      const accent = css.getPropertyValue("--accent").trim() || "#7dd3fc";
+      const faint = css.getPropertyValue("--faint").trim() || "rgba(255,255,255,.12)";
+      const N = 90, pts = hist.slice(-N);
+      const gen = pts.map(p => p.gen), prm = pts.map(p => showPrompt ? p.prompt : null);
+      const peak = Math.max(1, ...gen.filter(v => v != null));
+      const top = ($("peak").offsetHeight || 16) + 6, bottom = h - 2, x = i => w - (pts.length - 1 - i) * (w / (N - 1));
+      const y = v => bottom - (Math.min(v, peak) / peak) * (bottom - top);
+      g.strokeStyle = faint; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, bottom + .5); g.lineTo(w, bottom + .5); g.stroke();
+      // prompt rate: own scale, faint
+      const pPeak = Math.max(1, ...prm.filter(v => v != null));
+      line(prm.map(v => v == null ? null : bottom - (v / pPeak) * (bottom - top)), faint, 1.5, false);
+      line(gen.map(v => v == null ? null : y(v)), accent, 2.5, true);
+      $("peak").textContent = gen.some(v => v != null) ? `peak ${fmt(peak)} tok/s` : "";
+
+      function line(ys, color, width, fill) {
+        g.strokeStyle = color; g.lineWidth = width; g.lineJoin = "round";
+        let started = false, firstX = 0, lastX = 0;
+        g.beginPath();
+        ys.forEach((v, i) => {
+          if (v == null) { started = false; return; }
+          if (!started) { g.moveTo(x(i), v); firstX = x(i); started = true; } else g.lineTo(x(i), v);
+          lastX = x(i);
+        });
+        g.stroke();
+        if (fill && started) {
+          g.lineTo(lastX, bottom); g.lineTo(firstX, bottom); g.closePath();
+          const grd = g.createLinearGradient(0, top, 0, bottom);
+          grd.addColorStop(0, color + "55"); grd.addColorStop(1, color + "00");
+          g.fillStyle = grd; g.fill();
+        }
+      }
+    }
+
+    function startWatching() {
+      const P = window.plugins && window.plugins.Llmmonitor;
+      if (!P || !P.watch) { $("notice").textContent = T["needs icue-linux"]; $("notice").classList.remove("hidden"); return; }
+      const url = normalise(serverUrl);
+      if (url !== watching) {
+        if (watching) P.unwatch(watching);
+        watching = url; last = null;
+        $("meta").textContent = T.connecting;
+      }
+      P.watch(url, Math.round(Number(pollSeconds) * 1000) || 2000);
+    }
+
+    pluginLlmmonitorEvents = {
+      onInitialized: () => {
+        window.plugins.Llmmonitor.statsUpdated.connect((url, json) => {
+          if (url === watching) render(JSON.parse(json));
+        });
+        startWatching();
+      },
+    };
+
+    icueEvents = {
+      onICUEInitialized: async () => {
+        for (const k of KEYS) T[k] = await tr(k);
+        for (const [id, k] of [["runLabel", "running"], ["waitLabel", "waiting"], ["kvLabel", "KV cache"], ["promptLabel", "prompt"]])
+          $(id).textContent = T[k];
+        applyStyle();
+        if (typeof pluginLlmmonitor_initialized === "undefined") startWatching();  // plain iCUE: show notice
+      },
+      onDataUpdated: () => {
+        applyStyle();
+        if (typeof pluginLlmmonitor_initialized !== "undefined" && pluginLlmmonitor_initialized) startWatching();
+        if (last) render(last);
+      },
+    };
+    if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) { icueEvents.onICUEInitialized(); icueEvents.onDataUpdated(); }
+    if (typeof pluginLlmmonitor_initialized !== "undefined" && pluginLlmmonitor_initialized) pluginLlmmonitorEvents.onInitialized();
+    window.addEventListener("resize", () => last && drawSpark(last.history || []));
+  </script>
+</body>
+</html>

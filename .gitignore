@@ -2,3 +2,5 @@ __pycache__/
 *.egg-info/
 tests/.cfg/
 tests/smoke.png
+tests/.cfg-llm/
+tests/llm-*.png

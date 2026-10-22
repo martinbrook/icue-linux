@@ -21,3 +21,12 @@ size = "small"
 x = 860
 y = 12
 values = { layout = "text", textColor = "#4fc3f7" }   # optional property overrides
+
+# Monitor an LLM server (see README: LLM Monitor widget)
+# [[widget]]
+# path = "examples/llm-monitor"
+# instance = "llm-corsair"
+# size = "small"
+# x = 1708
+# y = 12
+# values = { serverUrl = "http://corsair-300:8731", displayName = "Corsair 300" }

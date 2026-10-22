@@ -1,0 +1,10 @@
+{
+  "en": { "translation": {
+    "LLM Monitor": "LLM Monitor", "Server": "Server", "Server URL": "Server URL", "Display name": "Display name",
+    "Refresh (seconds)": "Refresh (seconds)", "Show prompt rate": "Show prompt rate", "Appearance": "Appearance",
+    "Text Color": "Text Color", "Accent Color": "Accent Color", "Background": "Background", "Background Transparency": "Background Transparency",
+    "generating": "generating", "prompt": "prompt", "running": "running", "waiting": "waiting", "KV cache": "KV cache",
+    "online": "online", "offline": "offline", "idle": "idle", "connecting": "connecting…",
+    "metrics not exposed": "throughput needs a /metrics endpoint", "needs icue-linux": "This widget needs the icue-linux host"
+  } }
+}
