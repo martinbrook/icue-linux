@@ -34,6 +34,7 @@ PROMPT_SECONDS = ("llamacpp:prompt_seconds_total",)
 def _first(m: dict, names) -> float | None:
     return next((m[n] for n in names if n in m), None)
 MODELS_EVERY = 15     # seconds between /v1/models checks while /metrics works
+LIVE_STREAK = 3       # consecutive moving polls mid-request before a server counts as live
 
 _LINE = re.compile(r'^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+0-9.eEInfNa]+)')
 
@@ -137,6 +138,7 @@ class _Watch(QObject):
         # counters when it finishes. Until a counter is seen moving mid-request we
         # treat jumps as "request finished": no spike, the request's rate instead.
         self.live = False
+        self.move_streak = self.still_streak = 0
         self.prev_running = 0
         self.busy_since: float | None = None     # wall-clock time the current request started
         self.last_tps: float | None = None
@@ -306,8 +308,23 @@ class _Watch(QObject):
             dt = now - self.prev[0]
             dg, dp = gen - self.prev[1], (prompt or 0) - self.prev[2]
             if dt > 0 and dg >= 0 and dp >= 0:        # counters reset on server restart
-                if dg > 0 and self.prev_running > 0 and running_now > 0:
-                    self.live = True                  # counter moves mid-request: true live rate
+                # Live servers move their counters on every poll while generating.
+                # End-of-request servers only jump when a request completes, which
+                # can also happen mid-busy-period when an agent sends requests back
+                # to back, so require a streak before believing it's live, and drop
+                # back if the counter then sits still during a request.
+                if running_now > 0 and self.prev_running > 0:
+                    if dg > 0:
+                        self.move_streak += 1
+                        self.still_streak = 0
+                    else:
+                        self.still_streak += 1
+                        self.move_streak = 0
+                    if self.move_streak >= LIVE_STREAK:
+                        self.live = True
+                    elif self.still_streak >= LIVE_STREAK and self.live:
+                        self.live = False
+                        self.busy_since = None
                 if self.live:
                     gen_tps = dg / dt
                     prompt_tps = dp / dt if prompt is not None else None

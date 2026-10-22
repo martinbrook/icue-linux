@@ -16,7 +16,20 @@ STYLE = sys.argv[1] if len(sys.argv) > 1 else "vllm"
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18000
 T0 = time.time()
 MODEL = {"vllm": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit", "llamacpp": "Qwen3-35B-A3B-Q4_K_M.gguf",
-         "plain": "qwen3.8-flash-next", "burst": "halogen-qwen3.8-flash-next"}[STYLE]
+         "plain": "qwen3.8-flash-next", "burst": "halogen-qwen3.8-flash-next",
+         "agent": "halogen-qwen3.8-flash-next"}[STYLE]
+
+
+def agent_state():
+    """Like an agent loop on Halogen: two requests back to back (6 s then 4 s,
+    requests_processing stays 1 between them), then 5 s idle. Counters move only
+    when each request completes."""
+    t = time.time() - T0
+    cycles, rem = divmod(t, 15)
+    per_cycle = (6 + 4) * 45.0
+    gen = cycles * per_cycle + (0 if rem < 6 else 6 * 45.0) + (0 if rem < 10 else 4 * 45.0)
+    running = 1 if rem < 10 else 0
+    return running, gen, int(gen * 0.3)
 
 
 def burst_state():
@@ -48,7 +61,7 @@ def state():
 
 
 class H(BaseHTTPRequestHandler):
-    server_version = {"vllm": "uvicorn", "llamacpp": "llama.cpp", "plain": "halogen", "burst": "uvicorn"}[STYLE]
+    server_version = {"vllm": "uvicorn", "llamacpp": "llama.cpp", "plain": "halogen", "burst": "uvicorn", "agent": "uvicorn"}[STYLE]
 
     def log_message(self, *a):
         pass
@@ -90,8 +103,8 @@ class H(BaseHTTPRequestHandler):
                 "# TYPE llamacpp:requests_processing gauge", f"llamacpp:requests_processing {running}",
                 "# TYPE llamacpp:requests_deferred gauge", f"llamacpp:requests_deferred {waiting}", ""]),
                 "text/plain; version=0.0.4")
-        if self.path == "/metrics" and STYLE == "burst":
-            br, bg, bp = burst_state()
+        if self.path == "/metrics" and STYLE in ("burst", "agent"):
+            br, bg, bp = burst_state() if STYLE == "burst" else agent_state()
             return self.send(200, "\n".join([
                 "# TYPE llamacpp:prompt_tokens_total counter", f"llamacpp:prompt_tokens_total {bp}",
                 "# TYPE llamacpp:tokens_predicted_total counter", f"llamacpp:tokens_predicted_total {int(bg)}",
