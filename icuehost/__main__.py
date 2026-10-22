@@ -192,54 +192,6 @@ def cmd_run(a):
     _exit(app)
 
 
-SERVICE = "icue-linux.service"
-
-
-def cmd_service(a):
-    """Run a layout as a systemd user service: starts with your desktop session,
-    restarts within seconds if it ever crashes."""
-    import subprocess
-    unit = Path.home() / ".config/systemd/user" / SERVICE
-    sc = lambda *args: subprocess.run(["systemctl", "--user", *args], capture_output=True, text=True)  # noqa: E731
-    if a.action == "remove":
-        sc("disable", "--now", SERVICE)
-        unit.unlink(missing_ok=True)
-        sc("daemon-reload")
-        print("Removed the icue-linux service.")
-        return
-    if a.action == "status":
-        print(sc("status", "--no-pager", SERVICE).stdout or "not installed")
-        return
-    layout = Path(a.layout).expanduser().resolve()
-    if not layout.exists():
-        sys.exit(f"{layout} not found")
-    workdir = Path.cwd().resolve()     # so relative widget paths in the layout keep working
-    unit.parent.mkdir(parents=True, exist_ok=True)
-    unit.write_text(f"""[Unit]
-Description=icue-linux widgets on the Xeneon Edge
-PartOf=graphical-session.target
-After=graphical-session.target
-
-[Service]
-ExecStart={sys.executable} -m icuehost run {layout}
-WorkingDirectory={workdir}
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=graphical-session.target
-""")
-    sc("daemon-reload")
-    r = sc("enable", "--now", SERVICE)
-    if r.returncode:
-        sys.exit("systemctl failed: " + r.stderr.strip())
-    print(f"Installed and started {SERVICE} running {layout}")
-    print("It starts with your desktop session and restarts itself if it crashes.")
-    print("  logs:    journalctl --user -u icue-linux -f")
-    print("  restart: systemctl --user restart icue-linux   (after editing the layout)")
-    print("  stop:    systemctl --user stop icue-linux")
-
-
 EXT_UUID = "edge-guard@icue-linux"
 
 
@@ -407,10 +359,6 @@ def main(argv=None):
     p.add_argument("--quit-after", type=int, default=0, help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("screens"); p.set_defaults(fn=cmd_screens)
-    p = sub.add_parser("service", help="run a layout at login and restart it if it crashes")
-    p.add_argument("action", choices=["install", "remove", "status"])
-    p.add_argument("layout", nargs="?", default="examples/edge-layout.toml")
-    p.set_defaults(fn=cmd_service)
     p = sub.add_parser("touch-setup", help="map the Edge's touch panel to the Edge display (GNOME)")
     p.add_argument("--match", default="XENEON", help="text identifying the Edge display")
     p.add_argument("--device", help="touchscreen as vendor:product, if more than one is found")
