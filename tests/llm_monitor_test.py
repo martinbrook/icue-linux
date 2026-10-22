@@ -25,7 +25,7 @@ os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu"
 shutil.rmtree(HERE / ".cfg-llm", ignore_errors=True)
 
 servers = [subprocess.Popen([sys.executable, str(HERE / "fake_llm_server.py"), style, str(port)])
-           for style, port in (("vllm", 18000), ("llamacpp", 18001), ("plain", 18002))]
+           for style, port in (("vllm", 18000), ("llamacpp", 18001), ("plain", 18002), ("burst", 18003))]
 time.sleep(1.0)
 
 from PySide6.QtCore import QTimer  # noqa: E402
@@ -42,6 +42,7 @@ cases = [  # name, url, size, extra settings
     ("llamacpp", "http://127.0.0.1:18001", (840, 344), {"displayName": "Corsair 300"}),
     ("plain", "http://127.0.0.1:18002", (840, 344), {"displayName": "Halogen"}),
     ("down", "http://127.0.0.1:18009", (840, 344), {"displayName": "Corsair 300"}),
+    ("halogen", "http://127.0.0.1:18003", (840, 344), {"displayName": "Corsair 300"}),
     ("vllm-large", "http://127.0.0.1:18000", (840, 696), {"displayName": "DGX Spark"}),
     ("vllm-xl", "http://127.0.0.1:18000", (2536, 696), {"displayName": "DGX Spark", "accentColor": "#a78bfa"}),
 ]
@@ -97,6 +98,9 @@ def report():
     check("Halogen".lower() in p["meta"].lower() or p["meta"], "models-only: up with latency")
     check("metrics" in p["notice"], "models-only: explains missing throughput")
     check("down" in d["dot"] and "offline" in d["meta"].lower(), "unreachable server shown offline")
+    h = results["halogen"]
+    check(h["gen"] in ("…", "43") and h["label"] in ("generating", "last request"),
+          f"end-of-request counters: no spike, request rate shown ({h['gen']} / {h['label']})")
     errs = [c for v in views.values() for c in v.page().console if "rror" in c]
     check(not errs, "no JS errors" + (": " + "; ".join(errs) if errs else ""))
     print(f"\n{'ALL PASSED' if not failures else f'{len(failures)} FAILED'}")
@@ -105,6 +109,6 @@ def report():
     app.exit(1 if failures else 0)
 
 
-QTimer.singleShot(9000, collect)
+QTimer.singleShot(12500, collect)
 QTimer.singleShot(40000, lambda: (print("timeout"), [s.terminate() for s in servers], app.exit(2)))
 sys.exit(app.exec())

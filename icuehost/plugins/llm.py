@@ -127,6 +127,13 @@ class _Watch(QObject):
         self.prev: tuple[float, float, float] | None = None     # t, gen, prompt
         self.history: deque = deque(maxlen=HISTORY)
         self.state: dict = {"url": self.base, "up": False, "models": [], "history": []}
+        # Servers like llama.cpp (and Halogen) only add a request's tokens to the
+        # counters when it finishes. Until a counter is seen moving mid-request we
+        # treat jumps as "request finished": no spike, the request's rate instead.
+        self.live = False
+        self.prev_running = 0
+        self.busy_since: float | None = None     # wall-clock time the current request started
+        self.last_tps: float | None = None
         self.pending = 0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
@@ -207,6 +214,35 @@ class _Watch(QObject):
         except (ValueError, AttributeError, TypeError):
             self.state["hasSlots"] = False
 
+    def _burst(self, st, m, r, dg, dp, dt, running):
+        """Rates for servers whose counters only move when a request completes."""
+        now = r["t"]
+        if running > 0 and self.busy_since is None:
+            self.busy_since = now - dt / 2
+        if dg <= 0:
+            idle = 0.0 if running == 0 else None      # unknown while a request runs
+            return idle, idle
+        # a request just finished: work out its rate
+        metric = next((m[k] for k in ("llamacpp:predicted_tokens_seconds", "predicted_tokens_seconds")
+                       if m.get(k)), None)
+        duration = now - self.busy_since if self.busy_since is not None else None
+        if metric:
+            rate = metric
+        elif duration and duration > 0.5:
+            rate = dg / duration
+        else:
+            rate = None                               # too short to measure honestly
+        if rate is not None:
+            self.last_tps = rate
+            if self.busy_since is not None:           # draw the request at its rate
+                for pt in self.history:
+                    if pt["t"] >= self.busy_since:
+                        pt["gen"] = round(rate, 2)
+        self.busy_since = now if running > 0 else None
+        ptps = next((m[k] for k in ("llamacpp:prompt_tokens_seconds", "prompt_tokens_seconds")
+                     if m.get(k)), None)
+        return rate, ptps
+
     # --------------------------------------------------------------- publish
     def publish(self):
         r, st = self.round, self.state
@@ -234,23 +270,37 @@ class _Watch(QObject):
                   slotsTotal=r.get("slotsTotal"))
 
         gen_tps = prompt_tps = None
+        running_now = running or 0
+        busy_from_slots = r.get("slotsBusy")
+        if busy_from_slots is not None:
+            running_now = max(running_now, busy_from_slots)
+        now = time.monotonic()
+        point = {"t": r["t"], "up": st["up"], "gen": None, "prompt": None}
+        if gen is not None and self.prev:
+            dt = now - self.prev[0]
+            dg, dp = gen - self.prev[1], (prompt or 0) - self.prev[2]
+            if dt > 0 and dg >= 0 and dp >= 0:        # counters reset on server restart
+                if dg > 0 and self.prev_running > 0 and running_now > 0:
+                    self.live = True                  # counter moves mid-request: true live rate
+                if self.live:
+                    gen_tps = dg / dt
+                    prompt_tps = dp / dt if prompt is not None else None
+                else:
+                    gen_tps, prompt_tps = self._burst(st, m, r, dg, dp, dt, running_now)
         if gen is not None:
-            now = time.monotonic()
-            if self.prev:
-                dt = now - self.prev[0]
-                if dt > 0:
-                    dg, dp = gen - self.prev[1], (prompt or 0) - self.prev[2]
-                    if dg >= 0 and dp >= 0:          # counters reset on server restart
-                        gen_tps, prompt_tps = dg / dt, (dp / dt if prompt is not None else None)
             self.prev = (now, gen, prompt or 0)
         else:
             self.prev = None
-        st["genTps"], st["promptTps"] = gen_tps, prompt_tps
-        self.history.append({"t": r["t"], "up": st["up"],
-                             "gen": round(gen_tps, 2) if gen_tps is not None else None,
-                             "prompt": round(prompt_tps, 2) if prompt_tps is not None else None})
+        self.prev_running = running_now
+        st["genTps"], st["promptTps"], st["liveRate"] = gen_tps, prompt_tps, self.live
+        st["lastTps"], st["busy"] = self.last_tps, running_now > 0
+        point["gen"] = round(gen_tps, 2) if gen_tps is not None else None
+        point["prompt"] = round(prompt_tps, 2) if prompt_tps is not None else None
+        self.history.append(point)
         st["history"] = list(self.history)
         self.p.statsUpdated.emit(self.base, json.dumps(st))
+
+
 
 
 class LlmMonitorPlugin(PluginBase):

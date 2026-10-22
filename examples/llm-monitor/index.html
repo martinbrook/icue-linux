@@ -57,9 +57,9 @@
     // English defaults so first paint is right; replaced by tr() at init
     const T = { generating: "generating", prompt: "prompt", running: "running", waiting: "waiting",
                 "KV cache": "KV cache", online: "online", offline: "offline", idle: "idle",
-                connecting: "connecting…", "metrics not exposed": "throughput needs a /metrics endpoint",
+                connecting: "connecting…", "last request": "last request", "metrics not exposed": "throughput needs a /metrics endpoint",
                 "needs icue-linux": "This widget needs the icue-linux host" };
-    const KEYS = ["generating", "prompt", "running", "waiting", "KV cache", "online", "offline",
+    const KEYS = ["last request", "generating", "prompt", "running", "waiting", "KV cache", "online", "offline",
                   "idle", "connecting", "metrics not exposed", "needs icue-linux"];
     let last = null, watching = "";
 
@@ -84,7 +84,7 @@
     function render(s) {
       last = s;
       const up = !!s.up;
-      const busy = up && ((s.running || 0) > 0 || (s.genTps || 0) > 0.05);
+      const busy = up && (s.busy || (s.running || 0) > 0 || (s.genTps || 0) > 0.05);
       $("root").classList.toggle("down", !up);
       $("dot").className = "dot " + (up ? "up" : "down") + (busy ? " busy" : "");
       $("model").textContent = (s.models && s.models[0]) ? s.models.join(", ") : "";
@@ -99,8 +99,17 @@
       $("notice").classList.toggle("hidden", !noticeOn);
       for (const id of ["rateBox", "sideBox", "sparkBox"]) $(id).classList.toggle("hidden", noticeOn);
 
-      $("gen").textContent = hasRate ? fmt(s.genTps || 0) : "–";
-      $("genLabel").textContent = !up ? T.offline : busy ? T.generating : T.idle;
+      // Live servers report tokens as they stream. Others (llama.cpp, Halogen) only
+      // count a request when it finishes: show "…" while it runs, then its rate.
+      const live = s.liveRate !== false;
+      let big = "–", label = !up ? T.offline : busy ? T.generating : T.idle;
+      if (hasRate && up) {
+        if (s.genTps != null && (live || !busy)) big = fmt(s.genTps);
+        if (!live && busy) big = "…";
+        if (!live && !busy && s.lastTps != null) { big = fmt(s.lastTps); label = T["last request"]; }
+      }
+      $("gen").textContent = big;
+      $("genLabel").textContent = label;
       $("prompt").textContent = s.promptTps == null ? "–" : fmt(s.promptTps);
 
       $("running").textContent = s.running == null ? "–" : Math.round(s.running) + (s.slotsTotal ? `/${s.slotsTotal}` : "");

@@ -177,9 +177,12 @@ class WidgetView(QWebEngineView):
         _VIEWS.append(self)
         self.setPage(page)
         s = page.settings()
-        # NB: do not enable LocalContentCanAccessRemoteUrls: in QtWebEngine it stops
-        # external file:// stylesheets from applying. Widgets' fetch() to web APIs
-        # still works under normal CORS rules.
+        # Widgets are file:// pages that need both their own files (CSS, scripts)
+        # and the web (album art, weather APIs). In QtWebEngine, enabling remote
+        # access on its own stops local stylesheets applying; setting both makes
+        # both work. fetch() to web APIs then follows normal CORS rules.
+        s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars, False)
         s.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)

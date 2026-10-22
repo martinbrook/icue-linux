@@ -28,7 +28,13 @@ app = QApplication(sys.argv[:1])
 img = QImage(300, 300, QImage.Format.Format_RGB32)
 p = QPainter(img); g = QLinearGradient(0, 0, 300, 300); g.setColorAt(0, QColor("#ff6a3d")); g.setColorAt(1, QColor("#5b2a86"))
 p.fillRect(img.rect(), g); p.end(); img.save(str(STATE / "art.png"))
-os.environ["FAKE_ART"] = (STATE / "art.png").as_uri()
+# serve the art over http, like Spotify's CDN, to prove widgets can load web images
+import subprocess
+ART_SRV = subprocess.Popen([sys.executable, "-m", "http.server", "18077", "--bind", "127.0.0.1"],
+                           cwd=STATE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+os.environ["NO_PROXY"] = os.environ["no_proxy"] = "127.0.0.1,localhost"
+time.sleep(0.8)
+os.environ["FAKE_ART"] = "http://127.0.0.1:18077/art.png"
 
 from icuehost.host import WidgetInstance, WidgetView
 from icuehost.plugins import PluginHub
@@ -59,6 +65,7 @@ TAP = """(function(i){const b=document.querySelectorAll('#grid .btn')[i]; const 
  b.dispatchEvent(new PointerEvent('pointerdown',o)); b.dispatchEvent(new PointerEvent('pointerup',o)); return b.textContent.trim().slice(0,40);})(%d)"""
 STATE_JS = """(function(){try{return JSON.stringify({n: document.querySelectorAll('#grid .btn').length, tab: (document.querySelector('.tab.on')||{}).textContent,
  np: (document.querySelector('.np .t')||{}).textContent, art: (document.querySelector('.np .art')||{style:{}}).style.backgroundImage,
+ css: getComputedStyle(document.body).userSelect,
  playIcon: (document.querySelectorAll('#grid .btn')[2]||{innerHTML:''}).innerHTML.includes('rect'), toast: document.getElementById('toast').classList.contains('show') ? document.getElementById('toast').textContent : '',
  labels: [...document.querySelectorAll('#grid .lbl')].map(e=>e.textContent), cols: document.getElementById('grid').style.gridTemplateColumns})}catch(e){return JSON.stringify({err: String(e)})}})()"""
 
@@ -73,7 +80,8 @@ def s1():
     js(STATE_JS, lambda r: (print("  initial", r), r1(json.loads(r))))
 def r1(r):
     check(r["n"] == 10 and r["tab"] == "Main", "Main page rendered with 10 buttons")
-    check(r["np"] == "Wandering Signal" and "art.png" in r["art"], "now-playing tile shows track and album art")
+    check(r["np"] == "Wandering Signal" and "http://127.0.0.1:18077/art.png" in r["art"], "now-playing tile loads album art from the web")
+    check(r["css"] == "none", "widget stylesheet applied alongside web access")
     check(r["playIcon"], "play button shows pause icon while playing")
     check(deck_file.exists(), "default deck.toml created from example")
 
@@ -114,6 +122,7 @@ def s11():
 def done():
     errs = [c for v in views.values() for c in v.page().console if "rror" in c]
     check(not errs, "no JS errors" + (": " + "; ".join(errs) if errs else ""))
+    ART_SRV.terminate()
     print("\n" + ("ALL PASSED" if not fails else f"{len(fails)} FAILED"))
     app.exit(1 if fails else 0)
 

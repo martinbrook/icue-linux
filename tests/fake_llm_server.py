@@ -16,7 +16,17 @@ STYLE = sys.argv[1] if len(sys.argv) > 1 else "vllm"
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18000
 T0 = time.time()
 MODEL = {"vllm": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit", "llamacpp": "Qwen3-35B-A3B-Q4_K_M.gguf",
-         "plain": "qwen3.8-flash-next"}[STYLE]
+         "plain": "qwen3.8-flash-next", "burst": "halogen-qwen3.8-flash-next"}[STYLE]
+
+
+def burst_state():
+    """Halogen-like: one 6 s request every 10 s at 43 tok/s; the token counters
+    only jump when a request completes."""
+    t = time.time() - T0
+    done, rem = divmod(t, 10)
+    running = 1 if rem < 6 else 0
+    completed = int(done) + (0 if rem < 6 else 1)
+    return running, completed * 6 * 43.14, completed * 401
 
 
 def state():
@@ -38,7 +48,7 @@ def state():
 
 
 class H(BaseHTTPRequestHandler):
-    server_version = {"vllm": "uvicorn", "llamacpp": "llama.cpp", "plain": "halogen"}[STYLE]
+    server_version = {"vllm": "uvicorn", "llamacpp": "llama.cpp", "plain": "halogen", "burst": "uvicorn"}[STYLE]
 
     def log_message(self, *a):
         pass
@@ -79,6 +89,15 @@ class H(BaseHTTPRequestHandler):
                 "# TYPE llamacpp:kv_cache_usage_ratio gauge", f"llamacpp:kv_cache_usage_ratio {kv:.3f}",
                 "# TYPE llamacpp:requests_processing gauge", f"llamacpp:requests_processing {running}",
                 "# TYPE llamacpp:requests_deferred gauge", f"llamacpp:requests_deferred {waiting}", ""]),
+                "text/plain; version=0.0.4")
+        if self.path == "/metrics" and STYLE == "burst":
+            br, bg, bp = burst_state()
+            return self.send(200, "\n".join([
+                "# TYPE llamacpp:prompt_tokens_total counter", f"llamacpp:prompt_tokens_total {bp}",
+                "# TYPE llamacpp:tokens_predicted_total counter", f"llamacpp:tokens_predicted_total {int(bg)}",
+                "# TYPE llamacpp:predicted_tokens_seconds gauge", "llamacpp:predicted_tokens_seconds 43.14",
+                "# TYPE llamacpp:requests_processing gauge", f"llamacpp:requests_processing {br}",
+                "# TYPE llamacpp:requests_deferred gauge", "llamacpp:requests_deferred 0", ""]),
                 "text/plain; version=0.0.4")
         if self.path == "/slots" and STYLE == "llamacpp":
             return self.send(200, json.dumps([{"id": i, "is_processing": i < running} for i in range(4)]))

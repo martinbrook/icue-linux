@@ -4,7 +4,7 @@
     "Refresh (seconds)": "Refresh (seconds)", "Show prompt rate": "Show prompt rate", "Appearance": "Appearance",
     "Text Color": "Text Color", "Accent Color": "Accent Color", "Background": "Background", "Background Transparency": "Background Transparency",
     "generating": "generating", "prompt": "prompt", "running": "running", "waiting": "waiting", "KV cache": "KV cache",
-    "online": "online", "offline": "offline", "idle": "idle", "connecting": "connecting…",
+    "online": "online", "offline": "offline", "idle": "idle", "last request": "last request", "connecting": "connecting…",
     "metrics not exposed": "throughput needs a /metrics endpoint", "needs icue-linux": "This widget needs the icue-linux host"
   } }
 }
