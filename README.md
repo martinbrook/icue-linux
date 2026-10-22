@@ -157,6 +157,18 @@ python -m icuehost run examples/layout.toml
 `iCUE.defaultTemperatureUnit()` report.
 
 To stop it, press Ctrl+C in the terminal you started it from, or run `pkill -f icue-linux`.
+
+To have it start with your desktop and restart itself if it ever crashes:
+
+```sh
+icue-linux service install examples/edge-layout.toml   # run from the icue-linux folder
+journalctl --user -u icue-linux -f                       # its output
+systemctl --user restart icue-linux                      # after editing the layout
+icue-linux service remove
+```
+
+If it crashes, the Python stack at the moment of the crash is appended to
+`~/.cache/icue-linux/crash.log`.
 Both shut down cleanly and save widget state.
 
 Settings and the per-instance `uniqueId` live in `~/.config/icue-linux/instances/`;
