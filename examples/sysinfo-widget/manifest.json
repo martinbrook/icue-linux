@@ -1,0 +1,18 @@
+{
+  "author": "icue-linux",
+  "id": "org.icuelinux.sysinfo",
+  "name": "System Info",
+  "description": "Sample widget written to the iCUE Widget Specification, used to test the Linux host",
+  "version": "1.0.0",
+  "preview_icon": "resources/icon.svg",
+  "min_app_version": "5.47",
+  "min_framework_version": "1.0.0",
+  "os": [{ "platform": "windows" }],
+  "supported_devices": [{ "type": "dashboard_lcd", "features": ["sensor-screen"] }],
+  "interactive": true,
+  "required_plugins": [
+    "widgetbuilder.sensorsdataprovider:Sensors:1.0",
+    "widgetbuilder.mediadataprovider:Media:1.0"
+  ],
+  "modules": ["modules/Util.mjs"]
+}

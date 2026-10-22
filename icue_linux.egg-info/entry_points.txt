@@ -1,0 +1,2 @@
+[console_scripts]
+icue-linux = icuehost.__main__:main

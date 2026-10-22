@@ -1,0 +1,4 @@
+{
+  "en": { "translation": { "System Info": "System Info", "Text Color": "Text Color", "Appearance": "Appearance", "Sensor": "Sensor", "Layout": "Layout", "Now playing": "Now playing" } },
+  "de": { "translation": { "System Info": "Systeminfo", "Text Color": "Textfarbe", "Appearance": "Darstellung", "Sensor": "Sensor", "Layout": "Layout", "Now playing": "Läuft gerade" } }
+}

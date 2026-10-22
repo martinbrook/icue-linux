@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>tr('System Info')</title>
+  <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
+  <meta name="x-icue-widget-group" content="tr('System Info')" />
+  <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#FFFFFF'" />
+  <meta name="x-icue-property" content="accentColor" data-label="'Accent'" data-type="color" data-default="Util.accent()" />
+  <meta name="x-icue-property" content="layout" data-label="tr('Layout')" data-type="combobox" data-values="Util.layouts()" data-default="'bars'" />
+  <meta name="x-icue-property" content="fontSize" data-label="'Font Size'" data-type="slider" data-default="28" data-min="12" data-max="64" data-step="1" data-unit-label="'px'" />
+  <meta name="x-icue-property" content="showMedia" data-label="'Show media'" data-type="switch" data-default="true" />
+  <meta name="x-icue-property" content="tempSensor" data-label="tr('Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('temperature', 'package')" />
+  <script type="application/json" id="x-icue-groups">
+    [
+      { "title": "tr('Appearance')", "properties": ["textColor", "accentColor", "fontSize", "layout"], },
+      { "title": "tr('Sensor')", "properties": ["tempSensor", "showMedia"] }
+    ]
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; justify-content: center; gap: .4em; padding: 0 1em; box-sizing: border-box; }
+    .row { display: flex; align-items: center; gap: .6em; }
+    .name { width: 9em; opacity: .7; }
+    .bar { flex: 1; height: .5em; background: #ffffff22; border-radius: .25em; overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0; transition: width .4s; }
+    #media { opacity: .8; font-size: .7em; }
+    body.text .bar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="rows"></div>
+  <div id="media"></div>
+  <script>
+    // Promise wrapper written for this sample (not Corsair's file).
+    let rid = 1000;
+    function ask(plugin, method, ...args) {
+      return new Promise((resolve) => {
+        const id = rid++;
+        const h = (r, v) => { if (r === id) { plugin.asyncResponse.disconnect(h); resolve(v); } };
+        plugin.asyncResponse.connect(h);
+        plugin[method](id, ...args);
+      });
+    }
+
+    const rows = new Map();
+    window.__test = { events: [], values: {}, storage: null, tr: null };
+
+    function rowFor(id, name, units) {
+      if (rows.has(id)) return rows.get(id);
+      const el = document.createElement("div");
+      el.className = "row";
+      el.innerHTML = `<span class="name"></span><span class="val"></span><span class="bar"><i></i></span>`;
+      el.querySelector(".name").textContent = name;
+      document.getElementById("rows").appendChild(el);
+      const r = { el, units };
+      rows.set(id, r);
+      return r;
+    }
+    function show(id, value) {
+      const r = rows.get(id);
+      if (!r) return;
+      window.__test.values[id] = value;
+      r.el.querySelector(".val").textContent = `${value}${r.units}`;
+      const pct = r.units === "%" ? +value : r.units.includes("C") ? +value : 0;
+      r.el.querySelector(".bar > i").style.width = Math.max(0, Math.min(100, pct)) + "%";
+    }
+
+    async function onSensorsReady() {
+      window.__test.events.push("sensors:onInitialized");
+      const S = window.plugins.Sensorsdataprovider;
+      const wanted = [tempSensor];
+      for (const id of await ask(S, "getAllSensorIds")) {
+        const type = await ask(S, "getSensorType", id);
+        if (type === "load" && !wanted.includes(id)) wanted.push(id);
+      }
+      for (const id of wanted.slice(0, 4)) {
+        const [name, units, value] = await Promise.all([
+          ask(S, "getSensorName", id), ask(S, "getSensorUnits", id), ask(S, "getSensorValue", id)]);
+        rowFor(id, name, units); show(id, value);
+      }
+      S.sensorValueChanged.connect((id, v) => { window.__test.events.push("value:" + id); show(id, v); });
+    }
+    pluginSensorsdataproviderEvents = { onInitialized: onSensorsReady };
+    if (pluginSensorsdataprovider_initialized) onSensorsReady();
+
+    async function onMediaReady() {
+      window.__test.events.push("media:onInitialized");
+      const M = window.plugins.Mediadataprovider;
+      const refresh = async () => {
+        const [s, a] = await Promise.all([ask(M, "getSongName"), ask(M, "getArtist")]);
+        document.getElementById("media").textContent = showMedia && s ? `${await tr("Now playing")}: ${s} — ${a}` : "";
+      };
+      refresh(); setInterval(refresh, 3000);
+    }
+    pluginMediadataproviderEvents = { onInitialized: onMediaReady };
+
+    function onDataUpdated() {
+      window.__test.events.push("onDataUpdated");
+      document.body.style.color = textColor;
+      document.body.style.fontSize = fontSize + "px";
+      document.body.className = layout;
+      document.querySelectorAll(".bar > i").forEach(i => i.style.background = accentColor);
+    }
+    icueEvents = {
+      onICUEInitialized: async () => {
+        window.__test.events.push("onICUEInitialized");
+        // per-instance storage, as in the iCUE local-storage guide
+        const store = JSON.parse(localStorage.getItem(uniqueId) || "{}");
+        store.launches = (store.launches || 0) + 1;
+        localStorage.setItem(uniqueId, JSON.stringify(store));
+        window.__test.storage = store;
+        window.__test.tr = await tr("Text Color");
+        window.__test.icue = { lang: iCUE.iCUELanguage, unit: iCUE.defaultTemperatureUnit(), preview: iCUE.isPreview, device: device.deviceId };
+      },
+      onDataUpdated,
+    };
+    if (iCUE_initialized) { icueEvents.onICUEInitialized(); onDataUpdated(); }
+  </script>
+</body>
+</html>

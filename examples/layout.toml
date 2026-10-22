@@ -1,0 +1,23 @@
+# icue-linux layout for the Xeneon Edge (2560x720, horizontal).
+# Slot sizes follow iCUE: small 840x344 … xl 2536x696; or give w/h explicitly.
+
+[display]
+match = "XENEON"          # substring of the screen's name/model; see `python -m icuehost screens`
+temperature_unit = "°C"
+language = "en"
+background = "#000000"
+
+[[widget]]
+path = "examples/sysinfo-widget"       # folder or .icuewidget file
+instance = "sysinfo-left"              # settings + localStorage are kept per instance
+size = "large"                         # 840x696
+x = 12
+y = 12
+
+[[widget]]
+path = "examples/sysinfo-widget"
+instance = "sysinfo-right"
+size = "small"
+x = 860
+y = 12
+values = { layout = "text", textColor = "#4fc3f7" }   # optional property overrides
