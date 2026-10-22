@@ -95,10 +95,37 @@ different file per instance with the widget's **Deck file** setting (`media` →
 | Spotify / media buttons | `playerctl` |
 | Keystrokes on X11 | `xdotool` |
 | Keystrokes on KDE / wlroots Wayland | `wtype` |
-| Keystrokes on GNOME Wayland | `ydotool` and its `ydotoold` service (needs access to `/dev/uinput`) |
+| Keystrokes on GNOME Wayland | `ydotool`, with access to `/dev/uinput` (below) |
 
 The key tool is detected automatically. Override it with `[deck] key_backend = "..."`. Use
 `[deck] dry_run = true` to log actions instead of running them.
+
+**ydotool on Ubuntu (GNOME Wayland).** Ubuntu packages the older 0.1.x ydotool; icue-linux
+detects which version you have. It needs permission to create a virtual keyboard:
+
+```sh
+sudo apt install ydotool
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' \
+  | sudo tee /etc/udev/rules.d/80-uinput.rules
+sudo usermod -aG input $USER
+sudo udevadm control --reload-rules && sudo udevadm trigger
+# log out and back in, then check:  ydotool key ctrl+alt+t   (should open a terminal)
+```
+
+If keys are sometimes dropped, run `ydotoold &` once per session so ydotool reuses one
+virtual keyboard instead of creating a new one per key.
+
+**Apps opening on the Edge (GNOME).** GNOME opens new windows on the monitor you last
+touched or clicked, which after pressing a Deck button is the Edge. Wayland doesn't let other
+programs move windows, so icue-linux includes a small GNOME Shell extension that moves new app
+windows from the Edge to your primary monitor, leaving only icue-linux there:
+
+```sh
+icue-linux gnome-setup            # then log out and back in once
+icue-linux gnome-setup --remove   # to uninstall
+```
+
+It treats any non-primary monitor with a 3:1 or wider aspect ratio as the Edge.
 
 **Keyboard focus:** windows on the Edge ask not to take focus, so keystrokes go to the app you
 were using rather than to the deck. X11 and KDE honour this. GNOME on Wayland may still focus

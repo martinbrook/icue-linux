@@ -53,6 +53,7 @@ def _app():
     qInstallMessageHandler(_qt_log)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("icue-linux")
+    app.setDesktopFileName("icue-linux")      # Wayland app_id: lets the GNOME extension recognise us
     return app
 
 
@@ -191,6 +192,46 @@ def cmd_run(a):
     _exit(app)
 
 
+EXT_UUID = "edge-guard@icue-linux"
+
+
+def cmd_gnome_setup(a):
+    """Install (or remove) the GNOME Shell extension that keeps new app windows
+    off the Edge. Wayland doesn't let other programs move windows, so this has
+    to live inside GNOME Shell."""
+    import re
+    import shutil
+    import subprocess
+    dest = Path.home() / ".local/share/gnome-shell/extensions" / EXT_UUID
+    if a.remove:
+        subprocess.run(["gnome-extensions", "disable", EXT_UUID], capture_output=True)
+        shutil.rmtree(dest, ignore_errors=True)
+        print(f"Removed {EXT_UUID}. Log out and back in to unload it fully.")
+        return
+    try:
+        out = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout
+        major = int(re.search(r"(\d+)", out).group(1))
+    except (OSError, AttributeError, ValueError):
+        sys.exit("gnome-shell not found: this is only needed on GNOME.")
+    src = Path(__file__).with_name("gnome")
+    common = (src / "common.js.in").read_text()
+    variant = "extension.esm.js.in" if major >= 45 else "extension.legacy.js.in"
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "extension.js").write_text((src / variant).read_text().replace("/*COMMON*/", common))
+    (dest / "metadata.json").write_text(json.dumps({
+        "uuid": EXT_UUID, "name": "icue-linux Edge guard",
+        "description": "Opens new app windows on the main monitor instead of the Xeneon Edge.",
+        "shell-version": [str(major)], "version": 1}, indent=2))
+    subprocess.run(["gsettings", "set", "org.gnome.shell", "disable-user-extensions", "false"],
+                   capture_output=True)
+    r = subprocess.run(["gnome-extensions", "enable", EXT_UUID], capture_output=True, text=True)
+    print(f"Installed {EXT_UUID} for GNOME {major} in {dest}")
+    if r.returncode == 0:
+        print("Enabled. On Wayland, log out and back in once so GNOME Shell loads it.")
+    else:
+        print("Log out and back in, then run:\n  gnome-extensions enable " + EXT_UUID)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="icue-linux")
     ap.add_argument("--lang", default=None, help="iCUE language code (default: system)")
@@ -210,6 +251,8 @@ def main(argv=None):
     p.add_argument("--quit-after", type=int, default=0, help=argparse.SUPPRESS)
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("screens"); p.set_defaults(fn=cmd_screens)
+    p = sub.add_parser("gnome-setup", help="install the GNOME extension that keeps app windows off the Edge")
+    p.add_argument("--remove", action="store_true"); p.set_defaults(fn=cmd_gnome_setup)
     a = ap.parse_args(argv)
     a.fn(a)
 

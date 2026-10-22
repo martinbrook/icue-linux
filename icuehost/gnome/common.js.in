@@ -1,0 +1,48 @@
+// Shared logic, spliced into both extension formats by the installer.
+// New app windows that open on the Xeneon Edge (a very wide, non-primary
+// monitor) are moved to the primary monitor. icue-linux's own window stays.
+const ASPECT = 3.0;                      // the Edge is 32:9 (3.56); normal monitors are <= 2.4
+const KEEP = ['icue-linux'];             // app ids / WM classes allowed on the Edge
+
+function edgeMonitors(Main) {
+    const out = new Set();
+    Main.layoutManager.monitors.forEach((m, i) => {
+        const ratio = Math.max(m.width, m.height) / Math.min(m.width, m.height);
+        if (ratio >= ASPECT && i !== Main.layoutManager.primaryIndex)
+            out.add(i);
+    });
+    return out;
+}
+
+function shouldMove(Meta, Main, win) {
+    if (!win || win.get_window_type() !== Meta.WindowType.NORMAL)
+        return false;
+    const ids = [win.get_wm_class(), win.get_wm_class_instance(),
+                 win.get_gtk_application_id ? win.get_gtk_application_id() : null,
+                 win.get_sandboxed_app_id ? win.get_sandboxed_app_id() : null]
+        .filter(Boolean).join(' ').toLowerCase();
+    if (KEEP.some(k => ids.includes(k)))
+        return false;
+    return edgeMonitors(Main).has(win.get_monitor());
+}
+
+function relocate(Meta, Main, win) {
+    if (!shouldMove(Meta, Main, win))
+        return;
+    win.move_to_monitor(Main.layoutManager.primaryIndex);
+}
+
+function watch(Meta, Main) {
+    return global.display.connect('window-created', (display, win) => {
+        const actor = win.get_compositor_private();
+        if (!actor) {
+            relocate(Meta, Main, win);
+            return;
+        }
+        // wait for the first frame: before it, the window has no final monitor
+        const id = actor.connect('first-frame', () => {
+            actor.disconnect(id);
+            relocate(Meta, Main, win);
+        });
+    });
+}

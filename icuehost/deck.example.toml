@@ -47,7 +47,7 @@ name = "Main"
   [[page.button]]
   label = "Terminal"
   icon = "terminal"
-  keys = "ctrl+alt+t"
+  app = "org.gnome.Terminal"       # or keys = "ctrl+alt+t" (needs a key tool, see README)
   color = "#1f2937"
 
   [[page.button]]

@@ -130,13 +130,31 @@ def key_commands(backend: str, chord: list[str]) -> list[list[str]]:
             cmd += ["-m", "logo" if m == "super" else m]
         return [cmd]
     if backend == "ydotool":
+        legacy = [["ydotool", "key", "+".join(chord)]]   # ydotool 0.1.x (Ubuntu 22.04/24.04 package)
+        if ydotool_legacy():
+            return legacy
         codes = [EVDEV.get(k) for k in chord]
-        primary = []
-        if all(c is not None for c in codes):
-            primary = [["ydotool", "key", *[f"{c}:1" for c in codes], *[f"{c}:0" for c in reversed(codes)]]]
-        legacy = [["ydotool", "key", "+".join(chord)]]   # ydotool 0.1.x (Ubuntu's package)
-        return primary + legacy
+        if all(c is not None for c in codes):            # ydotool >= 1.0 wants evdev codes
+            return [["ydotool", "key", *[f"{c}:1" for c in codes], *[f"{c}:0" for c in reversed(codes)]]]
+        return legacy
     return []
+
+
+_YDOTOOL_LEGACY: bool | None = None
+
+
+def ydotool_legacy() -> bool:
+    """ydotool 0.1.x takes key names ("ctrl+alt+t"); 1.x takes evdev codes
+    ("29:1 56:1 20:1 ..."). Tell them apart by the key command's help text."""
+    global _YDOTOOL_LEGACY
+    if _YDOTOOL_LEGACY is None:
+        try:
+            r = subprocess.run(["ydotool", "key", "--help"], capture_output=True, text=True, timeout=2)
+            text = (r.stdout + r.stderr).lower()
+            _YDOTOOL_LEGACY = not ("keycode" in text or ":1" in text or "key_code" in text)
+        except (OSError, subprocess.TimeoutExpired):
+            _YDOTOOL_LEGACY = False
+    return _YDOTOOL_LEGACY
 
 
 def text_command(backend: str, text: str) -> list[str]:
@@ -309,7 +327,7 @@ class DeckPlugin(PluginBase):
         if "keys" in b or "text" in b:
             backend = d["backend"]
             if not backend:
-                return False, "no key tool: install xdotool (X11), wtype or ydotool (Wayland)"
+                return False, "keystrokes need ydotool on GNOME Wayland (see README), xdotool on X11"
             if "text" in b:
                 return self._call(d, [text_command(backend, str(b["text"]))])
             chords = b["keys"] if isinstance(b["keys"], list) else [b["keys"]]

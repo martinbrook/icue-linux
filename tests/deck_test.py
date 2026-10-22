@@ -20,6 +20,7 @@ os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu"
 sys.path.insert(0, str(ROOT))
 (STATE / "share/applications").mkdir(parents=True)
 (STATE / "share/applications/firefox.desktop").write_text("[Desktop Entry]\nName=Firefox\nExec=firefox\n")
+(STATE / "share/applications/org.gnome.Terminal.desktop").write_text("[Desktop Entry]\nName=Terminal\nExec=gnome-terminal\n")
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter
@@ -90,14 +91,14 @@ def r1(r):
 @step(800)
 def s2(): js(TAP % 5, lambda t: print("  tapped", t))            # Firefox (app)
 @step(400)
-def s3(): js(TAP % 4, lambda t: print("  tapped", t))            # Terminal (keys ctrl+alt+t)
+def s3(): js(TAP % 4, lambda t: print("  tapped", t))            # Terminal (app)
 @step(400)
 def s4(): js(TAP % 2, lambda t: print("  tapped", t))            # play-pause
 @step(1500)
 def s5():
     c = calls(); print("  calls:", c.strip().splitlines()[-6:])
     check("gtk-launch firefox" in c, "app button launches via gtk-launch")
-    check("xdotool key --clearmodifiers ctrl+alt+t" in c, "keys button sends chord via xdotool")
+    check("gtk-launch org.gnome.Terminal" in c, "terminal button launches the terminal app")
     check("playerctl -p spotify play-pause" in c, "spotify button calls playerctl")
     js(STATE_JS, lambda r: check(not json.loads(r)["playIcon"], "play icon flips after pause (mediaChanged)"))
 @step(500)
@@ -106,6 +107,10 @@ def s6(): js(TAP % 9, lambda t: print("  tapped", t))            # More -> page 
 def s7():
     js(STATE_JS, lambda r: check(json.loads(r)["tab"] == "Tools", "page button switches page"))
     small.grab().save(str(OUT / "deck-tools.png"))
+@step(300)
+def s7b(): js(TAP % 4, lambda t: print("  tapped", t))           # Tools: Copy (keys ctrl+c)
+@step(1200)
+def s7c(): check("xdotool key --clearmodifiers ctrl+c" in calls(), "keys button sends chord via xdotool")
 @step(300)
 def s8():   # live reload + failing action
     t = deck_file.read_text().replace('label = "Back"', 'label = "Home"')

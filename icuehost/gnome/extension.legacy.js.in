@@ -1,0 +1,8 @@
+// GNOME Shell 42-44
+const Meta = imports.gi.Meta;
+const Main = imports.ui.main;
+/*COMMON*/
+let handler = null;
+function init() {}
+function enable() { handler = watch(Meta, Main); }
+function disable() { if (handler) global.display.disconnect(handler); handler = null; }

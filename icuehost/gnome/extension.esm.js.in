@@ -1,0 +1,9 @@
+// GNOME Shell 45+
+import Meta from 'gi://Meta';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+/*COMMON*/
+export default class EdgeGuard extends Extension {
+    enable() { this._handler = watch(Meta, Main); }
+    disable() { if (this._handler) global.display.disconnect(this._handler); this._handler = null; }
+}
