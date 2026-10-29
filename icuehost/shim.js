@@ -114,4 +114,7 @@
     if (typeof qt !== "undefined" && qt.webChannelTransport) start();
     else document.addEventListener("DOMContentLoaded", start);
   }
+
+  // ---- free QWebChannel message memory (see _app() in __main__.py) --------
+  if (typeof w.gc === "function") setInterval(w.gc, 60000);
 })();

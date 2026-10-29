@@ -51,6 +51,13 @@ def _app():
             return
         sys.stderr.write(msg + "\n")
     qInstallMessageHandler(_qt_log)
+    # Every QWebChannel message leaves native memory in the renderer that only a
+    # full V8 GC frees, and widgets' small JS heaps never trigger one: the LLM
+    # monitor grew ~1 MB/min until it crashed. shim.js calls gc(), which needs this.
+    import os
+    flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+    if "--js-flags" not in flags:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (flags + " --js-flags=--expose-gc").strip()
     app = QApplication.instance() or QApplication(sys.argv[:1])
     from .qtfix import emit_leak
     if emit_leak():
