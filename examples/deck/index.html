@@ -105,6 +105,7 @@
         nav.appendChild(t);
       });
       const g = $("grid");
+      for (const box of g.querySelectorAll(".np .t, .np .a")) if (box.mq) box.mq.cancel();
       g.innerHTML = "";
       const page = pages[pageIdx];
       if (!page) { showNotice(deck.error || `No pages in ${deck.file}`); return; }
@@ -204,6 +205,8 @@
       text = text || "";
       if (box.dataset.text === text && box.firstChild) return;   // unchanged: keep scrolling
       box.dataset.text = text;
+      // An infinite animation keeps its detached track alive, so cancel it first
+      if (box.mq) box.mq.cancel(), box.mq = null;
       box.classList.remove("scrolling");
       box.innerHTML = "";
       const track = document.createElement("span");
@@ -227,7 +230,7 @@
         const distance = first.getBoundingClientRect().width + gap;
         const travel = distance / MARQUEE_SPEED * 1000;
         const total = MARQUEE_HOLD + travel;
-        track.animate([
+        box.mq = track.animate([
           { transform: "translateX(0)" },
           { transform: "translateX(0)", offset: MARQUEE_HOLD / total },
           { transform: `translateX(${-distance}px)` },
