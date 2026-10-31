@@ -1,4 +1,5 @@
-"""Spotify Web API, just enough to save the playing track to Liked Songs.
+"""Spotify Web API, just enough to save the playing track to Liked Songs and
+tell whether it's already there.
 
 MPRIS (playerctl) has no "like", so this uses the Web API with a PKCE login:
 no client secret, only a client ID from your own app at developer.spotify.com
@@ -13,6 +14,7 @@ import hashlib
 import json
 import os
 import secrets
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -27,9 +29,10 @@ ACCOUNTS = "https://accounts.spotify.com"
 API = "https://api.spotify.com/v1"
 PORT = 8898
 REDIRECT = f"http://127.0.0.1:{PORT}/callback"     # register exactly this in the Spotify app
-SCOPE = "user-library-modify"
+SCOPE = "user-library-modify user-library-read"     # save, and show whether it's saved
 
 _token: dict = {}                                   # {"access": str, "expires": monotonic}
+_lock = threading.Lock()                            # liked-checks run on worker threads
 
 
 def _post_token(form: dict) -> dict:
@@ -47,8 +50,11 @@ def _save_auth(auth: dict) -> None:
 
 
 def _access_token() -> str:
-    if _token.get("expires", 0) > time.monotonic():
-        return _token["access"]
+    with _lock:
+        return _refresh() if _token.get("expires", 0) <= time.monotonic() else _token["access"]
+
+
+def _refresh() -> str:
     auth = json.loads(AUTH_FILE.read_text())
     t = _post_token({"grant_type": "refresh_token", "refresh_token": auth["refresh_token"],
                      "client_id": auth["client_id"]})
@@ -90,6 +96,24 @@ def save(uri: str) -> tuple[bool, str]:
         except (urllib.error.URLError, OSError, ValueError, KeyError) as e:
             return False, f"Spotify unreachable: {getattr(e, 'reason', e)}"
     return False, "Spotify rejected the login"
+
+
+def contains(uri: str) -> bool | None:
+    """Whether uri is in the user's library; None when unknown (not logged in,
+    a login from before read access was asked for, offline)."""
+    if not AUTH_FILE.exists():
+        return None
+    try:
+        req = urllib.request.Request(f"{API}/me/library/contains?" + urllib.parse.urlencode({"uris": uri}),
+                                     headers={"Authorization": f"Bearer {_access_token()}"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return bool(json.load(r)[0])
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _token.clear()
+        return None
+    except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError):
+        return None
 
 
 def login(client_id: str) -> None:

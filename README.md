@@ -138,7 +138,10 @@ needs a one-time setup:
   spotify = "like"
 ```
 
-It likes only, it doesn't unlike, and it skips ads, podcast episodes and local files.
+The heart turns Spotify green when the playing track is already in Liked Songs (checked once
+per track, so a like or unlike made in the Spotify app shows from the next track). It likes
+only, it doesn't unlike, and it skips ads, podcast episodes and local files. Logins made
+before the green heart was added can't read your library: run `spotify-login` again.
 
 **Apps opening on the Edge (GNOME).** GNOME opens new windows on the monitor you last
 touched or clicked, which after pressing a Deck button is the Edge. Wayland doesn't let other

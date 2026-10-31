@@ -180,6 +180,8 @@
           el.classList.toggle("active", !!playing);
         } else if (verb === "shuffle") {
           el.classList.toggle("active", info && info.shuffle === "true");
+        } else if (verb === "like") {
+          el.classList.toggle("liked", !!(info && info.liked));
         } else if (verb === "now-playing") {
           el.classList.toggle("paused", !playing);
           const art = el.querySelector(".art");

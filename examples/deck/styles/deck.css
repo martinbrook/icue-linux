@@ -36,6 +36,8 @@ body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--tex
 .btn .lbl { font-size: clamp(10px, 4.4cqh, 20px); font-weight: 500; max-width: 92%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .92; }
 .nolabels .btn .lbl { display: none; }
 .btn.active .ico { color: var(--accent); }
+.btn.liked .ico { color: #1db954; }               /* Spotify green: playing track is in Liked Songs */
+.btn.liked .ico svg { fill: currentColor; }
 
 /* now-playing tile */
 /* The tile is its own size container so the cover can be a true square:

@@ -31,6 +31,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 try:
@@ -179,8 +180,9 @@ class DeckPlugin(PluginBase):
 
     deckChanged = Signal(str, str)        # profile, deck JSON (no commands)
     pressed = Signal(str, str)            # profile, JSON {page, index, ok, message}
-    mediaChanged = Signal(str)            # JSON {player, status, title, artist, art, running}
+    mediaChanged = Signal(str)            # JSON {player, status, title, artist, art, liked, running}
     pageRequested = Signal(str, str)      # profile, page name
+    _likedChecked = Signal(str, object)   # uri, True/False/None, from a worker thread
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -192,6 +194,8 @@ class DeckPlugin(PluginBase):
         self.media_timer.setInterval(1000)
         self.media_timer.timeout.connect(self._poll_media)
         self.log: list[list[str]] = []            # dry-run record (tests, debugging)
+        self.liked: dict[str, bool | None] = {}   # track uri -> in Liked Songs (None: unknown)
+        self._likedChecked.connect(self._liked_checked)
 
     # ------------------------------------------------------------ config
     def _path(self, profile: str) -> Path:
@@ -392,13 +396,34 @@ class DeckPlugin(PluginBase):
         if self._dry(d):
             self.log.append(["spotify-like", uri])
             return True, f"dry-run: like {uri}"
-        return spotify_api.save(uri)
+        ok, msg = spotify_api.save(uri)
+        if ok:
+            self.liked[uri] = True
+            QTimer.singleShot(0, self._poll_media)
+        return ok, msg
+
+    def _has_like_button(self) -> bool:
+        return any(b.get("spotify") == "like" for d in self.decks.values()
+                   for p in d["pages"] for b in p.get("button", []))
+
+    def _check_liked(self, uri: str):
+        """Look up uri in Liked Songs off the Qt thread; the answer comes back via _likedChecked."""
+        self.liked[uri] = None                    # asked once per track, even if unknown
+        threading.Thread(target=lambda: emit(self._likedChecked, uri, spotify_api.contains(uri)),
+                         daemon=True).start()
+
+    def _liked_checked(self, uri: str, liked):
+        if len(self.liked) > 500:
+            self.liked.clear()
+        self.liked[uri] = liked
+        self._poll_media()
 
     def _poll_media(self):
         if not shutil.which("playerctl"):
             info = {"running": False, "error": "playerctl is not installed"}
         else:
-            fmt = "{{status}}\t{{title}}\t{{artist}}\t{{mpris:artUrl}}\t{{playerName}}\t{{loop}}\t{{shuffle}}"
+            fmt = ("{{status}}\t{{title}}\t{{artist}}\t{{mpris:artUrl}}\t{{playerName}}\t{{loop}}\t{{shuffle}}"
+                   "\t{{mpris:trackid}}")
             info = {"running": False}
             for name, args in (("spotify", ["-p", "spotify"]), ("any", [])):
                 try:
@@ -411,10 +436,16 @@ class DeckPlugin(PluginBase):
                     info[name] = {"status": parts[0], "title": parts[1], "artist": parts[2],
                                   "art": fix_art_url(parts[3]), "player": parts[4],
                                   "loop": parts[5] if len(parts) > 5 else "",
-                                  "shuffle": parts[6] if len(parts) > 6 else ""}
+                                  "shuffle": parts[6] if len(parts) > 6 else "",
+                                  "trackid": parts[7] if len(parts) > 7 else ""}
             info["running"] = "spotify" in info
             if info["running"]:
                 info["loop"] = info["spotify"].get("loop", "")
+                uri = spotify_api.track_uri(info["spotify"]["trackid"])
+                if uri and self._has_like_button():
+                    if uri not in self.liked:
+                        self._check_liked(uri)
+                    info["spotify"]["liked"] = self.liked[uri]
         if info != self.media:
             self.media = info
             emit(self.mediaChanged, json.dumps(info))
