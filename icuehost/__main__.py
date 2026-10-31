@@ -208,6 +208,11 @@ def cmd_run(a):
 EXT_UUID = "edge-guard@icue-linux"
 
 
+def cmd_spotify_login(a):
+    from .spotify_api import login
+    login(a.client_id)
+
+
 def cmd_gnome_setup(a):
     """Install (or remove) the GNOME Shell extension that keeps new app windows
     off the Edge. Wayland doesn't let other programs move windows, so this has
@@ -378,6 +383,9 @@ def main(argv=None):
     p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_touch_setup)
     p = sub.add_parser("gnome-setup", help="install the GNOME extension that keeps app windows off the Edge")
     p.add_argument("--remove", action="store_true"); p.set_defaults(fn=cmd_gnome_setup)
+    p = sub.add_parser("spotify-login", help="log in to Spotify once, for the deck's spotify = \"like\" button")
+    p.add_argument("client_id", help="Client ID of your app at developer.spotify.com")
+    p.set_defaults(fn=cmd_spotify_login)
     a = ap.parse_args(argv)
     a.fn(a)
 

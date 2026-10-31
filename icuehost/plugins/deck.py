@@ -15,7 +15,8 @@ Button actions (the first matching key wins):
   keys    = "ctrl+alt+t"              send a key chord; a list sends several in turn
   text    = "hello"                   type text
   spotify = "play-pause"              play-pause | play | pause | next | previous | stop |
-                                      volume-up | volume-down | shuffle | repeat | now-playing
+                                      volume-up | volume-down | shuffle | repeat | now-playing |
+                                      like (save to Liked Songs; needs icue-linux spotify-login)
   media   = "play-pause"              same verbs, whichever MPRIS player is active
   page    = "Media"                   switch the deck to another page
 
@@ -40,12 +41,13 @@ except ModuleNotFoundError:              # Python 3.10
 from PySide6.QtCore import QFileSystemWatcher, QTimer, Signal, Slot
 
 from .base import PluginBase
+from .. import spotify_api
 from ..qtfix import emit
 
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "icue-linux"
 EXAMPLE = Path(__file__).resolve().parent.parent / "deck.example.toml"
 SPOTIFY_VERBS = {"play-pause", "play", "pause", "next", "previous", "stop", "volume-up",
-                 "volume-down", "shuffle", "repeat", "now-playing"}
+                 "volume-down", "shuffle", "repeat", "now-playing", "like"}
 
 # ---------------------------------------------------------------- key names
 ALIASES = {  # friendly name -> X keysym (xdotool / wtype)
@@ -361,6 +363,8 @@ class DeckPlugin(PluginBase):
             verb = "play-pause"
         if verb not in SPOTIFY_VERBS:
             return False, f"unknown media action {verb!r}"
+        if verb == "like":
+            return self._like(d) if "spotify" in b else (False, "like works on spotify buttons only")
         if "spotify" in b and not self.media.get("running") and verb in ("play-pause", "play"):
             # Spotify closed: start it instead
             launch = d["settings"].get("spotify_command", "spotify")
@@ -372,6 +376,23 @@ class DeckPlugin(PluginBase):
         ok, msg = self._call(d, [["playerctl", *player, *args]])
         QTimer.singleShot(250, self._poll_media)
         return ok, msg
+
+    def _like(self, d) -> tuple[bool, str]:
+        """Save the playing Spotify track to Liked Songs (Web API; MPRIS can't)."""
+        try:
+            trackid = subprocess.run(["playerctl", "-p", "spotify", "metadata", "mpris:trackid"],
+                                     capture_output=True, text=True, timeout=1).stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            trackid = ""
+        if not trackid:
+            return False, "Spotify isn't playing anything"
+        uri = spotify_api.track_uri(trackid)
+        if not uri:
+            return False, "only Spotify tracks can be liked (not ads, episodes or local files)"
+        if self._dry(d):
+            self.log.append(["spotify-like", uri])
+            return True, f"dry-run: like {uri}"
+        return spotify_api.save(uri)
 
     def _poll_media(self):
         if not shutil.which("playerctl"):

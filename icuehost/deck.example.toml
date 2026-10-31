@@ -9,7 +9,8 @@
 #   keys = "ctrl+alt+t"              key chord (or a list of chords)
 #   text = "hello"                   type text
 #   spotify = "play-pause"           play-pause | next | previous | volume-up | volume-down |
-#                                    shuffle | repeat | now-playing (tile with album art)
+#                                    shuffle | repeat | now-playing (tile with album art) |
+#                                    like (save to Liked Songs; README → Spotify "like")
 #   media = "play-pause"             same, for whichever player is active
 #   page = "Media"                   switch page
 # Optional: icon (built-in name, an emoji, or an image path), color, span (columns wide).

@@ -85,7 +85,7 @@ name = "Main"
 
 Actions: `app`, `command` (no shell), `shell`, `url`, `keys`, `text`, `spotify` / `media`
 (`play-pause`, `next`, `previous`, `volume-up`, `volume-down`, `shuffle`, `repeat`,
-`now-playing`) and `page`. Pages appear as tabs down the left; swipe to change page. The
+`now-playing`, and `like` for Spotify only, below) and `page`. Pages appear as tabs down the left; swipe to change page. The
 grid sizes itself to the widget slot. Put `columns` / `rows` on a page to fix it. Use a
 different file per instance with the widget's **Deck file** setting (`media` →
 `~/.config/icue-linux/media.toml`).
@@ -116,6 +116,29 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 If keys are sometimes dropped, run `ydotoold &` once per session so ydotool reuses one
 virtual keyboard instead of creating a new one per key.
+
+**Spotify "like".** `spotify = "like"` saves the playing track to your Liked Songs. Spotify's
+desktop player can't do this through `playerctl`, so it goes through the Spotify Web API, which
+needs a one-time setup:
+
+1. At [developer.spotify.com](https://developer.spotify.com/dashboard), create an app (Web API)
+   with the redirect URI `http://127.0.0.1:8898/callback`. Spotify requires the app's owner to
+   have Premium.
+2. Run `icue-linux spotify-login <Client ID>` and approve in the browser **as the account your
+   Spotify app plays from** (use "Not you?" to switch). It prints the account it logged in as.
+   If that isn't the developer app's owner, add it under the app's *User Management* first.
+   The login is kept in `~/.config/icue-linux/spotify.json` (readable only by you); run it
+   again to switch account or if it's revoked.
+3. Add the button:
+
+```toml
+  [[page.button]]
+  label = "Like"
+  icon = "heart"
+  spotify = "like"
+```
+
+It likes only, it doesn't unlike, and it skips ads, podcast episodes and local files.
 
 **Apps opening on the Edge (GNOME).** GNOME opens new windows on the monitor you last
 touched or clicked, which after pressing a Deck button is the Edge. Wayland doesn't let other
