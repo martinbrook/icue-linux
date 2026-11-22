@@ -1,0 +1,57 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --text: #e8edf2; --accent: #34d399; --bg: #0b0f14; --bg-opacity: 1;
+  --muted: color-mix(in srgb, var(--text) 55%, transparent);
+  --faint: color-mix(in srgb, var(--text) 12%, transparent);
+  --ok: #4ade80; --bad: #f87171; --warn: #fbbf24;
+}
+html, body { height: 100%; overflow: hidden; background: transparent; }
+body {
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--text);
+  font-variant-numeric: tabular-nums; container-type: size;
+}
+.bgfill { position: fixed; inset: 0; background: var(--bg); opacity: var(--bg-opacity); border-radius: 14px; }
+.root { position: relative; height: 100%; padding: 6cqh 4cqw; display: flex; flex-direction: column; }
+/* several devices share the slot: side by side when wide, stacked when tall */
+.devices { flex: 1; display: flex; gap: 6cqh 5cqw; min-height: 0; }
+@container (aspect-ratio < 1.6) { .devices { flex-direction: column; } }
+.dev + .dev { border-left: 1px solid var(--faint); padding-left: 5cqw; }
+@container (aspect-ratio < 1.6) { .dev + .dev { border-left: 0; padding-left: 0; border-top: 1px solid var(--faint); padding-top: 6cqh; } }
+.dev { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2cqh; }
+
+.head { display: flex; align-items: baseline; gap: 1.6cqw; min-width: 0; }
+.dot { width: 2.6cqh; height: 2.6cqh; min-width: 8px; min-height: 8px; border-radius: 50%; background: var(--muted);
+       flex: none; align-self: center; }
+.charging .dot, .idle .dot, .discharging .dot { background: var(--ok); }
+.offline .dot { background: var(--bad); }
+.offline .packs { opacity: .45; }
+.name { font-size: clamp(12px, 7cqh, 34px); font-weight: 600; white-space: nowrap; }
+.model { font-size: clamp(10px, 4.6cqh, 20px); color: var(--muted); white-space: nowrap; overflow: hidden;
+         text-overflow: ellipsis; min-width: 0; flex: 1; }
+.total { font-size: clamp(18px, 13cqh, 72px); font-weight: 300; line-height: 1; letter-spacing: -0.02em; }
+
+.packs { display: flex; flex-direction: column; justify-content: center; gap: 2.2cqh; flex: 1; }
+.pack { display: grid; grid-template-columns: 8em 1fr 3.2em; align-items: center; gap: 2cqw;
+        font-size: clamp(10px, 5cqh, 22px); }
+.pl { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv { text-align: right; font-weight: 600; }
+.bar { position: relative; height: clamp(6px, 4.2cqh, 22px); border-radius: 999px; background: var(--faint); }
+.bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--accent); }
+/* at FLASH_AT% or below: red and flashing. opacity only, so it runs on the compositor and
+   never relayouts (animating layout properties leaked renderer memory, see git log) */
+.low .bar i { background: var(--bad); animation: flash 1s ease-in-out infinite; }
+.low .pv { color: var(--bad); }
+@keyframes flash { 50% { opacity: .25; } }
+/* charge-limit marker */
+.bar b { position: absolute; top: -25%; bottom: -25%; width: 2px; margin-left: -1px; border-radius: 1px;
+         background: color-mix(in srgb, var(--text) 60%, transparent); }
+
+.st { display: flex; flex-wrap: wrap; gap: .4em 1.4em; font-size: clamp(10px, 4.6cqh, 20px); color: var(--muted); }
+.st b { color: var(--text); font-weight: 600; }
+.state { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.charging .state { color: var(--ok); }
+.discharging .state { color: var(--warn); }
+.offline .state { color: var(--bad); }
+
+.notice { font-size: clamp(10px, 4.6cqh, 20px); color: var(--muted); }
+.hidden { display: none; }

@@ -1,0 +1,9 @@
+{
+  "en": { "translation": {
+    "EcoFlow Batteries": "EcoFlow Batteries", "Refresh (seconds)": "Refresh (seconds)", "Data": "Data", "Appearance": "Appearance",
+    "Text Color": "Text Color", "Accent Color": "Accent Color", "Background": "Background", "Background Transparency": "Background Transparency",
+    "Main": "Main", "Extra": "Extra", "Battery": "Battery", "charging": "charging", "discharging": "discharging", "idle": "idle", "offline": "offline",
+    "in": "in", "out": "out", "full in": "full in", "empty in": "empty in", "limit": "limit", "discharge limit": "discharge limit", "connecting": "connecting…",
+    "needs icue-linux": "This widget needs the icue-linux host"
+  } }
+}

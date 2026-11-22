@@ -8,3 +8,5 @@ tests/.cfg-deck/
 tests/.deck-state/
 .venv/
 tests/.cfg-spotify/
+tests/.cfg-ecoflow/
+tests/ecoflow-*.png

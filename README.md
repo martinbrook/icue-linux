@@ -30,6 +30,7 @@ Qt signal/slot plugin objects. icue-linux does the same with PySide6:
 | Media (`widgetbuilder.mediadataprovider`) | MPRIS via `playerctl` |
 | Link (`widgetbuilder.linkprovider`) | opens http(s)/mailto in the default browser |
 | FPS (`widgetbuilder.fpsdataprovider`) | newest MangoHud CSV log (enable MangoHud logging) |
+| EcoFlow (`icuelinux.ecoflow`) | Home Assistant REST API, EcoFlow Cloud integration |
 | Device Action, Stream Deck, anything else | present and initialised, but silent |
 
 ## LLM Monitor widget
@@ -59,6 +60,29 @@ names from unknown engines are matched by suffix (`..._generation_tokens_total`,
 `..._num_requests_running`, `..._kv_cache_usage_perc` ...), so engines that follow vLLM or
 llama.cpp naming are picked up automatically. Test without a real server:
 `python tests/fake_llm_server.py vllm 18000`.
+
+## EcoFlow Batteries widget
+
+`examples/ecoflow` shows the charge of your EcoFlow power stations, with a bar for each extra
+battery, whether they're charging or discharging, power in and out, time to full or empty and
+the charge limit. It reads them from Home Assistant's
+[EcoFlow Cloud](https://github.com/tolwi/hassio-ecoflow-cloud) integration (HACS), every
+10 seconds by default, and finds every EcoFlow battery there by itself.
+
+Give icue-linux the HA address and a long-lived token (HA → your profile → Security →
+Long-lived access tokens). Run this in a terminal, so the token isn't echoed or kept in history:
+
+```sh
+read -rsp "HA token: " T; echo; umask 077; mkdir -p ~/.config/icue-linux
+printf '{"url": "https://ha.example.com", "token": "%s"}\n' "$T" > ~/.config/icue-linux/homeassistant.json; unset T
+```
+
+Use the URL your browser uses, with a valid certificate: icue-linux checks it. The token stays
+in that file (readable only by you) and never reaches the widget.
+
+**Extra batteries not showing?** EcoFlow Cloud creates their sensors (`..._slave_1_battery_level`
+and so on) disabled. In HA, open Settings → Devices & services → Entities, show disabled
+entities, search `slave` and enable them.
 
 ## Deck widget (Stream Deck-style buttons)
 

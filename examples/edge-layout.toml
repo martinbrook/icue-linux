@@ -1,4 +1,4 @@
-# Xeneon Edge (2560x720) — MoonPhase clock and LLM monitor on the left, Deck on the right.
+# Xeneon Edge (2560x720) — MoonPhase clock, LLM monitor and EcoFlow on the left, Deck on the right.
 # Run with:  icue-linux run examples/edge-layout.toml
 
 [display]
@@ -13,16 +13,24 @@ instance = "moon"
 x = 12
 y = 12
 w = 840
-h = 342
+h = 200
 
 [[widget]]
 path = "examples/llm-monitor"
 instance = "llm-corsair"
 x = 12
-y = 366
+y = 224
 w = 840
-h = 342
+h = 220
 values = { serverUrl = "http://CORSAIR-IP:8731", displayName = "Corsair 300" }   # put the Corsair's IP here
+
+[[widget]]
+path = "examples/ecoflow"
+instance = "ecoflow"
+x = 12
+y = 456
+w = 840
+h = 252
 
 [[widget]]
 path = "examples/deck"

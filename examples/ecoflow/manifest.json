@@ -1,0 +1,14 @@
+{
+  "author": "Martin Brook",
+  "id": "org.icuelinux.ecoflow",
+  "name": "EcoFlow Batteries",
+  "description": "Charge of your EcoFlow power stations and their extra batteries, read from Home Assistant's EcoFlow Cloud integration. Needs the icue-linux host.",
+  "version": "1.0.0",
+  "preview_icon": "resources/icon.svg",
+  "min_app_version": "5.47",
+  "min_framework_version": "1.0.0",
+  "os": [{ "platform": "windows" }],
+  "supported_devices": [{ "type": "dashboard_lcd" }],
+  "interactive": false,
+  "required_plugins": ["icuelinux.ecoflow:EcoFlow:1.0"]
+}

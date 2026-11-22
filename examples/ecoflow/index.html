@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>tr('EcoFlow Batteries')</title>
+  <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
+
+  <meta name="x-icue-property" content="pollSeconds" data-label="tr('Refresh (seconds)')" data-type="slider" data-default="10" data-min="5" data-max="60" data-step="5" />
+  <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#e8edf2'" />
+  <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#34d399'" />
+  <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background')" data-type="color" data-default="'#0b0f14'" />
+  <meta name="x-icue-property" content="transparency" data-label="tr('Background Transparency')" data-type="slider" data-default="100" data-min="0" data-max="100" data-step="1" />
+  <script type="application/json" id="x-icue-groups">
+    [
+      { "title": "tr('Data')", "properties": ["pollSeconds"] },
+      { "title": "tr('Appearance')", "properties": ["textColor", "accentColor", "backgroundColor", "transparency"] }
+    ]
+  </script>
+  <link rel="stylesheet" href="styles/ecoflow.css" />
+</head>
+<body>
+  <div class="bgfill"></div>
+  <div class="root" id="root">
+    <div class="devices" id="devices"></div>
+    <div class="notice" id="notice">connecting…</div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    // English defaults so first paint is right; replaced by tr() at init
+    const T = { Main: "Main", Extra: "Extra", Battery: "Battery", charging: "charging", discharging: "discharging", idle: "idle",
+                offline: "offline", in: "in", out: "out", "full in": "full in", "empty in": "empty in",
+                limit: "limit", "discharge limit": "discharge limit", connecting: "connecting…", "needs icue-linux": "This widget needs the icue-linux host" };
+    let last = null;
+
+    const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const pct = (v) => v == null ? "–" : Math.round(v) + "%";
+    const watts = (v) => v == null ? "–" : (v >= 1000 ? (v / 1000).toFixed(2) + " kW" : Math.round(v) + " W");
+    const mins = (m) => m >= 60 ? `${Math.floor(m / 60)} h ${Math.round(m % 60)} m` : `${Math.round(m)} m`;
+
+    function applyStyle() {
+      const r = document.documentElement.style;
+      r.setProperty("--text", textColor);
+      r.setProperty("--accent", accentColor);
+      r.setProperty("--bg", backgroundColor);
+      r.setProperty("--bg-opacity", Math.max(0, Math.min(100, Number(transparency))) / 100);
+    }
+
+    const FLASH_AT = 15;           // % at or below which a bar flashes red
+    const mark = (at, title) => at ? `<b style="left:${at}%" title="${title} ${at}%"></b>` : "";
+
+    function bar(label, level, d) {
+      const w = level == null ? 0 : Math.max(0, Math.min(100, level));
+      const low = level != null && level <= FLASH_AT;
+      // re-rendering restarts CSS animations; a clock-based delay keeps every flash in step
+      const phase = low ? `;animation-delay:-${(Date.now() % 1000) / 1000}s` : "";
+      return `<div class="pack${low ? " low" : ""}">
+        <span class="pl">${esc(label)}</span>
+        <div class="bar"><i style="width:${w}%${phase}"></i>${mark(d.minLevel, T["discharge limit"])}${mark(d.limit, T.limit)}</div>
+        <span class="pv">${pct(level)}</span></div>`;
+    }
+
+    function device(d) {
+      const net = (d.inW || 0) - (d.outW || 0);
+      const state = d.online === false ? "offline" : net > 20 ? "charging" : net < -20 ? "discharging" : "idle";
+      const left = state === "charging" && d.chargeMin > 0 ? `${T["full in"]} ${mins(d.chargeMin)}`
+                 : state === "discharging" && d.dischargeMin > 0 ? `${T["empty in"]} ${mins(d.dischargeMin)}` : "";
+      const packs = d.packs.length
+        ? d.packs.map(p => bar(p.label === "Main" ? T.Main : p.label.replace("Extra", T.Extra), p.level, d)).join("")
+        : bar(T.Battery, d.level, d);
+      return `<section class="dev ${state}">
+        <div class="head"><span class="dot"></span><span class="name">${esc(d.name)}</span>
+          <span class="model">${esc(d.model)}</span><span class="total">${pct(d.level)}</span></div>
+        <div class="packs">${packs}</div>
+        <div class="st"><span class="state">${T[state]}</span>
+          ${state === "offline" ? "" : `<span>${T.in} <b>${watts(d.inW)}</b></span><span>${T.out} <b>${watts(d.outW)}</b></span>`}
+          ${left ? `<span>${left}</span>` : ""}</div>
+      </section>`;
+    }
+
+    function render(s) {
+      last = s;
+      $("devices").innerHTML = (s.devices || []).map(device).join("");
+      $("notice").textContent = s.error || "";
+      $("notice").classList.toggle("hidden", !s.error);
+    }
+
+    function startWatching() {
+      const P = window.plugins && window.plugins.Ecoflow;
+      if (!P || !P.watch) { $("notice").textContent = T["needs icue-linux"]; return; }
+      P.watch(Math.round(Number(pollSeconds) * 1000) || 10000);
+    }
+
+    pluginEcoflowEvents = {
+      onInitialized: () => {
+        window.plugins.Ecoflow.statusUpdated.connect((json) => render(JSON.parse(json)));
+        startWatching();
+      },
+    };
+
+    icueEvents = {
+      onICUEInitialized: async () => {
+        for (const k of Object.keys(T)) T[k] = await tr(k);
+        if (!last) $("notice").textContent = T.connecting;
+        applyStyle();
+        if (typeof pluginEcoflow_initialized === "undefined") startWatching();  // plain iCUE: show notice
+      },
+      onDataUpdated: () => {
+        applyStyle();
+        if (typeof pluginEcoflow_initialized !== "undefined" && pluginEcoflow_initialized) startWatching();
+        if (last) render(last);
+      },
+    };
+    if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) { icueEvents.onICUEInitialized(); icueEvents.onDataUpdated(); }
+    if (typeof pluginEcoflow_initialized !== "undefined" && pluginEcoflow_initialized) pluginEcoflowEvents.onInitialized();
+  </script>
+</body>
+</html>
